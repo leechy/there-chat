@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">There</string>
+    <string name="settings">Settings</string>
+    <string name="notifications">Notifications</string>
+    <string name="zoom_in">Zoom in</string>
+    <string name="zoom_out">Zoom out</string>
+    <string name="my_location">My location</string>
+    <string name="new_chat">New Chat</string>
+    <string name="my_chats">My Chats</string>
+    <string name="zoom_in_to_see_chats">Zoom in to see chats</string>
+    <string name="chats_here">%1$d chats here</string>
+</resources>
