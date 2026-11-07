@@ -21,3 +21,7 @@ android/.kotlin/
 
 # deploy
 /build/
+
+# secrets (APNs key, service accounts)
+*.p8
+*-service-account*.json

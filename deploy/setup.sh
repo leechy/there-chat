@@ -53,6 +53,7 @@ echo "== service user and folders"
 id there >/dev/null 2>&1 || useradd --system --home-dir /var/lib/there --shell /usr/sbin/nologin there
 install -d -o root -g root -m 755 /opt/there /var/www/there
 install -d -o there -g there -m 750 /var/lib/there
+install -d -o root -g there -m 750 /etc/there
 
 echo "== config files"
 install -m 644 "$SRC/there.service" /etc/systemd/system/there.service

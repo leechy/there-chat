@@ -8,6 +8,8 @@ User=there
 Group=there
 Environment=THERE_ADDR=127.0.0.1:8080
 Environment=THERE_DB=/var/lib/there/there.db
+# Secrets and per-server settings (APNs, FCM); optional, not in git.
+EnvironmentFile=-/etc/there/there.env
 ExecStart=/opt/there/there
 Restart=always
 RestartSec=2
