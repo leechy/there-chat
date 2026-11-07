@@ -51,6 +51,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,12 +83,15 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import com.therechat.app.core.Chat
 import com.therechat.app.core.ChatKind
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 private val Paris = LatLng(48.8530, 2.3499)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
 @Composable
 fun MapHomeScreen(vm: MapViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -131,10 +135,14 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
         )
     }
 
-    LaunchedEffect(camera.isMoving) {
-        if (!camera.isMoving) {
-            camera.projection?.visibleRegion?.latLngBounds?.let(vm::onCameraIdle)
-        }
+    // Load chats once the map is ready and whenever the camera settles,
+    // including jumps without animation (e.g. centring on the user at start).
+    LaunchedEffect(mapLoaded) {
+        if (!mapLoaded) return@LaunchedEffect
+        snapshotFlow { camera.isMoving to camera.position }
+            .filter { (moving, _) -> !moving }
+            .debounce(150)
+            .collect { camera.projection?.visibleRegion?.latLngBounds?.let(vm::onCameraIdle) }
     }
 
     Box(Modifier.fillMaxSize()) {
