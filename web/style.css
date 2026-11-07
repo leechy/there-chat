@@ -1,0 +1,63 @@
+:root {
+  color-scheme: light dark;
+  --ink: #121e49;
+  --muted: #5d6585;
+  --soft: #949bb4;
+  --accent: #264bca;
+  --bg: #ffffff;
+  --panel: #f2f4fa;
+  --line: #dadde8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e6e9f5;
+    --muted: #a7adc4;
+    --soft: #8a91aa;
+    --accent: #6e8cff;
+    --bg: #0e1120;
+    --panel: #1c2033;
+    --line: #33384d;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: var(--accent); }
+.wrap { max-width: 44rem; margin: 0 auto; padding: 0 16px; }
+
+header.site { padding: 20px 0; }
+header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { font-weight: 700; font-size: 1.25rem; color: var(--accent); text-decoration: none; letter-spacing: -0.01em; }
+header.site nav a { color: var(--muted); text-decoration: none; margin-left: 16px; font-size: 0.95rem; }
+header.site nav a:hover { color: var(--ink); }
+
+footer.site { border-top: 1px solid var(--line); margin-top: 64px; padding: 24px 0 40px; color: var(--soft); font-size: 0.9rem; }
+footer.site a { color: var(--soft); margin-right: 16px; }
+
+/* Home */
+.hero { display: grid; grid-template-columns: 1fr 15rem; gap: 40px; align-items: start; padding: 48px 0 16px; }
+.hero h1 { font-size: clamp(2.2rem, 6vw, 3.2rem); line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em; }
+.hero p { color: var(--muted); margin: 0 0 12px; }
+.hero .soon { display: inline-block; margin-top: 12px; padding: 8px 16px; border-radius: 999px; background: var(--panel); color: var(--ink); font-weight: 600; font-size: 0.95rem; }
+.phone { width: 100%; border-radius: 28px; border: 6px solid var(--ink); box-shadow: 0 20px 50px rgba(18, 30, 73, 0.2); display: block; }
+.points { list-style: none; padding: 0; margin: 32px 0 0; display: grid; gap: 12px; }
+.points li { background: var(--panel); border-radius: 14px; padding: 14px 18px; }
+.points b { display: block; }
+.points span { color: var(--muted); font-size: 0.95rem; }
+@media (max-width: 640px) {
+  .hero { grid-template-columns: 1fr; gap: 24px; }
+  .phone { max-width: 15rem; margin: 0 auto; }
+}
+
+/* Legal pages */
+.doc h1 { font-size: 2rem; line-height: 1.2; margin: 24px 0 4px; }
+.doc .updated { color: var(--soft); margin: 0 0 24px; }
+.doc h2 { font-size: 1.2rem; margin: 32px 0 8px; }
+.doc ul { padding-left: 1.2em; }
+.doc li { margin: 4px 0; }

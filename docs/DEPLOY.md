@@ -9,12 +9,13 @@
 |---|---|
 | Домен `there-chat.com` | куплен, DNS у регистратора |
 | Google Play Console | аккаунт есть |
-| Apple Developer Program | продлевается |
+| Apple Developer Program | оплачен, ждём активации; Team ID `UWJ374YJ4M` |
 | Дроплет DigitalOcean | `there1-1gb-fra1`, 1 ГБ / 25 ГБ, настроен (`make provision`), сервер выложен |
 | DNS A-записи `@`, `api`, `www` | прописаны, HTTPS работает |
 | GitHub `leechy/there-chat` (публичный) | создан |
 | Firebase-проект (только FCM для Android) | не создан |
-| Почта `support@there-chat.com` | не настроена |
+| Почта `support@there-chat.com` | не настроена (адрес уже указан на сайте) |
+| Сайт, `/privacy/`, `/terms/` | выложены (`make web`) |
 
 ## 0. Аккаунты и долгие ожидания
 
