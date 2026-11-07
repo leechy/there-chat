@@ -48,6 +48,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("POST /v1/devices", s.registerDevice)
 
+	s.mux.HandleFunc("DELETE /v1/devices/me", s.auth(s.eraseDevice))
 	s.mux.HandleFunc("PUT /v1/devices/me/push", s.auth(s.setPush))
 	s.mux.HandleFunc("DELETE /v1/devices/me/push", s.auth(s.clearPush))
 	s.mux.HandleFunc("GET /v1/names/suggest", s.auth(s.suggestNames))

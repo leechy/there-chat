@@ -39,6 +39,7 @@ struct ThereApp: App {
             }
             .sheet(isPresented: $router.showSettings) {
                 SettingsView()
+                    .environment(router)
             }
             .alert("Can't open the link", isPresented: .init(
                 get: { router.linkError != nil }, set: { if !$0 { router.linkError = nil } })

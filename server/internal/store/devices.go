@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"errors"
@@ -46,4 +47,75 @@ func (s *Store) SetPushToken(ctx context.Context, deviceID, platform, token stri
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE devices SET push_platform = ?, push_token = ? WHERE id = ?`, p, t, deviceID)
 	return err
+}
+
+// Erased tells callers which chats an erased device touched, for realtime events.
+type Erased struct {
+	DeletedChats []string          // chats the device owned, now deleted
+	LeftChats    map[string]string // chat ID -> member ID, for chats it was in
+}
+
+// EraseDevice removes everything the device posted and unlinks the device
+// row from its secret, so the old key no longer works and the remaining rows
+// (kept for foreign keys and abuse reports) point at nobody.
+//   - chats it owns are deleted: title, place and all message text wiped;
+//   - its text messages are deleted and its system messages removed;
+//   - its reactions, and reactions on its messages, are removed;
+//   - its memberships lose their name and become "left" (blocks stay);
+//   - the device's push token is cleared and its secret hash replaced.
+func (s *Store) EraseDevice(ctx context.Context, deviceID string) (Erased, error) {
+	out := Erased{LeftChats: map[string]string{}}
+	now := s.now().Unix()
+	err := s.tx(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, `
+			SELECT m.id, m.chat_id, m.role FROM members m JOIN chats c ON c.id = m.chat_id
+			WHERE m.device_id = ? AND c.deleted_at IS NULL`, deviceID)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id, chat, role string
+			if err := rows.Scan(&id, &chat, &role); err != nil {
+				rows.Close()
+				return err
+			}
+			if role == RoleOwner {
+				out.DeletedChats = append(out.DeletedChats, chat)
+			} else {
+				out.LeftChats[chat] = id
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+
+		mine := `SELECT id FROM members WHERE device_id = ?2`
+		stmts := []string{
+			`UPDATE chats SET deleted_at = COALESCE(deleted_at, ?1), title = '', emoji = '', lat = 0, lng = 0
+			 WHERE id IN (SELECT chat_id FROM members WHERE device_id = ?2 AND role = 'owner')`,
+			`UPDATE messages SET body = '' WHERE chat_id IN
+			 (SELECT chat_id FROM members WHERE device_id = ?2 AND role = 'owner')`,
+			`DELETE FROM reactions WHERE member_id IN (` + mine + `)
+			 OR message_id IN (SELECT id FROM messages WHERE member_id IN (` + mine + `))`,
+			`DELETE FROM messages WHERE kind = 'system' AND member_id IN (` + mine + `)`,
+			`UPDATE messages SET status = 'deleted', body = '', author_name = '', deleted_at = COALESCE(deleted_at, ?1)
+			 WHERE member_id IN (` + mine + `)`,
+			`UPDATE members SET name = '', role = CASE role WHEN 'owner' THEN 'owner' ELSE 'member' END,
+			 status = CASE status WHEN 'blocked' THEN 'blocked' ELSE 'left' END, updated_at = ?1
+			 WHERE device_id = ?2`,
+		}
+		for _, q := range stmts {
+			if _, err := tx.ExecContext(ctx, q, now, deviceID); err != nil {
+				return err
+			}
+		}
+		dead := make([]byte, 32)
+		rand.Read(dead)
+		_, err = tx.ExecContext(ctx, `
+			UPDATE devices SET token_hash = ?, push_platform = NULL, push_token = NULL WHERE id = ?`,
+			dead, deviceID)
+		return err
+	})
+	return out, err
 }

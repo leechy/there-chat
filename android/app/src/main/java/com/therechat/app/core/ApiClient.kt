@@ -113,6 +113,13 @@ class ApiClient(
 
     suspend fun updateChat(id: String, settings: ChatSettings): Chat = call(HttpMethod.Patch, "/v1/chats/$id", enc(settings)).body()
 
+    /** Erases everything this device posted, then forgets its key: the next call registers a new device. */
+    suspend fun eraseDevice() {
+        call(HttpMethod.Delete, "/v1/devices/me")
+        identity.reset()
+        registerLock.withLock { registered = false }
+    }
+
     suspend fun deleteChat(id: String) { call(HttpMethod.Delete, "/v1/chats/$id") }
 
     suspend fun join(id: String, name: String, invite: String?): Chat =

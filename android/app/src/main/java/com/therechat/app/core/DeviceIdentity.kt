@@ -3,6 +3,7 @@ package com.therechat.app.core
 import android.content.Context
 import android.util.Base64
 import com.google.android.gms.auth.blockstore.Blockstore
+import com.google.android.gms.auth.blockstore.DeleteBytesRequest
 import com.google.android.gms.auth.blockstore.RetrieveBytesRequest
 import com.google.android.gms.auth.blockstore.StoreBytesData
 import kotlinx.coroutines.sync.Mutex
@@ -30,6 +31,15 @@ class DeviceIdentity(context: Context) {
         val encoded = encode(bytes)
         prefs.edit().putString(KEY, encoded).apply()
         encoded
+    }
+
+    /** Forgets the secret here and in Block Store; a new one is made on next use. */
+    suspend fun reset() = mutex.withLock {
+        prefs.edit().remove(KEY).commit()
+        runCatching {
+            blockstore.deleteBytes(DeleteBytesRequest.Builder().setKeys(listOf(KEY)).build()).await()
+        }
+        Unit
     }
 
     private suspend fun restore(): ByteArray? = runCatching {

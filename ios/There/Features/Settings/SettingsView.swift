@@ -3,6 +3,10 @@ import SwiftUI
 /// App settings and the privacy story in plain words.
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(Router.self) private var router
+    @State private var confirmErase = false
+    @State private var erasing = false
+    @State private var eraseError: String?
 
     var body: some View {
         NavigationStack {
@@ -19,6 +23,22 @@ struct SettingsView: View {
                           systemImage: "key")
                 }
                 Section {
+                    Button(role: .destructive) {
+                        confirmErase = true
+                    } label: {
+                        HStack {
+                            Text("Erase My Data")
+                            if erasing {
+                                Spacer()
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(erasing)
+                } footer: {
+                    Text("Deletes your messages, reactions and names in every chat, removes you from your chats and deletes the chats you created. This can't be undone.")
+                }
+                Section {
                     LabeledContent("Version",
                                    value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                 }
@@ -26,12 +46,42 @@ struct SettingsView: View {
             .labelStyle(SettingsLabelStyle())
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog("Erase all your data?", isPresented: $confirmErase, titleVisibility: .visible) {
+                Button("Erase Everything", role: .destructive) { Task { await erase() } }
+            } message: {
+                Text("Your messages and names will be deleted from every chat, and chats you created will be deleted for everyone. You will start over as a new anonymous user.")
+            }
+            .alert("Couldn't erase your data", isPresented: .init(
+                get: { eraseError != nil }, set: { if !$0 { eraseError = nil } })
+            ) {
+                Button("OK") {}
+            } message: {
+                Text(eraseError ?? "")
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done", systemImage: "checkmark") { dismiss() }
                 }
             }
         }
+    }
+}
+
+extension SettingsView {
+    private func erase() async {
+        erasing = true
+        defer { erasing = false }
+        do {
+            try await APIClient.shared.eraseDevice()
+        } catch {
+            eraseError = error.localizedDescription
+            return
+        }
+        // Reconnect as the new device; the socket's resync reloads the map.
+        Realtime.shared.stop()
+        Realtime.shared.start()
+        router.path = []
+        dismiss()
     }
 }
 

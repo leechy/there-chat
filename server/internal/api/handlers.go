@@ -73,6 +73,24 @@ func (s *Server) clearPush(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// eraseDevice deletes everything this device posted and retires its key.
+// The client then forgets the key and starts over as a new device.
+func (s *Server) eraseDevice(w http.ResponseWriter, r *http.Request) {
+	erased, err := s.store.EraseDevice(r.Context(), deviceID(r))
+	if err != nil {
+		s.internal(w, r, err)
+		return
+	}
+	for _, id := range erased.DeletedChats {
+		s.publish(r.Context(), Event{Type: EvChatDeleted, ChatID: id}, "")
+	}
+	for chat, member := range erased.LeftChats {
+		s.publish(r.Context(), Event{Type: EvMessageDeleted, ChatID: chat, MemberID: member}, "")
+		s.publish(r.Context(), Event{Type: EvMember, ChatID: chat, MemberID: member, Action: MemberLeft}, "")
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) suggestNames(w http.ResponseWriter, r *http.Request) {
 	n, _ := strconv.Atoi(r.URL.Query().Get("count"))
 	n = min(max(n, 1), 10)

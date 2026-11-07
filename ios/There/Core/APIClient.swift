@@ -96,6 +96,14 @@ actor APIClient {
         try await send("PATCH", "/v1/chats/\(id)", body: settings)
     }
 
+    /// Erases everything this device posted, then forgets its key: the next
+    /// request registers a brand-new anonymous device.
+    func eraseDevice() async throws {
+        try await sendEmpty("DELETE", "/v1/devices/me")
+        try DeviceIdentity.reset()
+        registered = false
+    }
+
     func deleteChat(_ id: String) async throws {
         try await sendEmpty("DELETE", "/v1/chats/\(id)")
     }
