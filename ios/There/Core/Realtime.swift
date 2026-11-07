@@ -61,8 +61,8 @@ final class Realtime {
         let id = UUID()
         let (stream, continuation) = AsyncStream.makeStream(of: RealtimeEvent.self, bufferingPolicy: .bufferingNewest(32))
         listeners[id] = continuation
-        continuation.onTermination = { _ in
-            Task { @MainActor [weak self] in self?.listeners[id] = nil }
+        continuation.onTermination = { [weak self] _ in
+            Task { @MainActor in self?.listeners[id] = nil }
         }
         return stream
     }

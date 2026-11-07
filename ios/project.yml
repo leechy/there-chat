@@ -10,6 +10,8 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: UWJ374YJ4M
+    CODE_SIGN_STYLE: Automatic
   configs:
     Debug:
       THERE_API_BASE_URL: http://localhost:8080
@@ -35,6 +37,9 @@ targets:
     info:
       path: There/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
         ThereAPIBaseURL: $(THERE_API_BASE_URL)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

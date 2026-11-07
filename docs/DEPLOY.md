@@ -111,6 +111,16 @@ Firebase Dynamic Links закрыты (август 2025), поэтому всё
   `app/build/outputs/bundle/release/app-release.aab`. Перед каждой загрузкой нужно
   увеличивать `versionCode` в `app/build.gradle.kts`.
 
+## Сборка iOS для TestFlight
+
+- Подпись автоматическая, команда `UWJ374YJ4M` (в `ios/project.yml`). В Xcode нужно войти
+  Apple ID: Settings → Accounts.
+- `cd ios && xcodegen generate`, открыть `There.xcodeproj`, устройство «Any iOS Device (arm64)»,
+  Product → Archive → Distribute App → App Store Connect → Upload.
+- Перед каждой загрузкой увеличивать `CURRENT_PROJECT_VERSION` в `ios/project.yml`
+  (версию `MARKETING_VERSION` — при новом релизе).
+- `ITSAppUsesNonExemptEncryption = NO`: только HTTPS, вопрос про шифрование не задаётся.
+
 ## 4. Доработки сервера и приложений до выхода
 
 - [ ] Rate limiting: регистрация устройств, отправка сообщений, создание чатов, вступления.
