@@ -27,8 +27,14 @@ data class ChatUiState(
     val outbox: List<Message> = emptyList(),
     val hasOlder: Boolean = true,
     val loadingOlder: Boolean = false,
+    /** Errors from things the user did (send, react, delete…), shown as a dialog. */
     val error: String? = null,
     val gone: Boolean = false,
+    /**
+     * Background refreshes can't reach the server. Shown as a banner; what's
+     * already loaded stays readable and polling keeps retrying.
+     */
+    val offline: Boolean = false,
 ) {
     val me: Member? get() = chat.me
     val canRead: Boolean get() = chat.isMember || (chat.freeJoin && me?.status != Member.Status.BLOCKED)
@@ -111,7 +117,7 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
     private suspend fun refreshChat() {
         try {
             val chat = api.chat(chatId, invite)
-            _state.update { it.copy(chat = chat) }
+            _state.update { it.copy(chat = chat, offline = false) }
         } catch (e: ApiException) {
             if (e.error.code == "not_found" || e.error.code == "forbidden") {
                 _state.update { it.copy(gone = true, error = if (e.error.code == "forbidden") "You can't access this chat anymore." else "This chat doesn't exist anymore.") }
@@ -120,6 +126,7 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
+            _state.update { it.copy(offline = true) }
         }
     }
 
@@ -133,11 +140,12 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
             }
             if (s.messages.isEmpty()) _state.update { it.copy(hasOlder = latest.size == 50) }
             merge(latest)
+            _state.update { it.copy(offline = false) }
             markRead()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            _state.update { it.copy(error = e.message) }
+        } catch (_: Exception) {
+            _state.update { it.copy(offline = true) }
         }
     }
 
@@ -149,11 +157,12 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
                 val page = api.messages(chatId, after = _state.value.lastSeq, limit = 100, invite = invite)
                 merge(page)
             } while (page.size == 100)
+            _state.update { it.copy(offline = false) }
             markRead()
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            _state.update { it.copy(error = e.message) }
+        } catch (_: Exception) {
+            _state.update { it.copy(offline = true) }
         }
     }
 
@@ -165,10 +174,12 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
         viewModelScope.launch {
             try {
                 val older = api.messages(chatId, before = first.seq, limit = 50, invite = invite)
-                _state.update { it.copy(hasOlder = older.size == 50) }
+                _state.update { it.copy(hasOlder = older.size == 50, offline = false) }
                 merge(older)
-            } catch (e: Exception) {
-                _state.update { it.copy(error = e.message) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _state.update { it.copy(offline = true) }
             } finally {
                 _state.update { it.copy(loadingOlder = false) }
             }

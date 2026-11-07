@@ -13,7 +13,11 @@ final class ChatModel {
     private(set) var messages: [Message] = []
     private(set) var hasOlder = true
     private(set) var isLoading = false
+    /// Errors from things the user did (send, react, delete…), shown as an alert.
     var error: String?
+    /// True while background refreshes can't reach the server. Shown as a
+    /// banner; what's already loaded stays readable and polling keeps retrying.
+    private(set) var isOffline = false
 
     /// Messages typed here that the server hasn't confirmed yet.
     private(set) var outbox: [Message] = []
@@ -122,10 +126,13 @@ final class ChatModel {
     func refreshChat() async {
         do {
             chat = try await api.chat(chat.id, invite: invite)
+            isOffline = false
         } catch let e as APIError where e.code == "not_found" || e.code == "forbidden" {
             error = e.code == "forbidden" ? "You can't access this chat anymore." : "This chat doesn't exist anymore."
             stop()
-        } catch {}
+        } catch {
+            isOffline = true
+        }
     }
 
     /// Fetches the newest page and merges it, which also picks up edits to
@@ -141,9 +148,10 @@ final class ChatModel {
             }
             if messages.isEmpty { hasOlder = latest.count == 50 }
             merge(latest)
+            isOffline = false
             await markRead()
         } catch {
-            self.error = error.localizedDescription
+            isOffline = true
         }
     }
 
@@ -156,9 +164,10 @@ final class ChatModel {
                 page = try await api.messages(chat.id, after: lastSeq, limit: 100, invite: invite)
                 merge(page)
             } while page.count == 100
+            isOffline = false
             await markRead()
         } catch {
-            self.error = error.localizedDescription
+            isOffline = true
         }
     }
 
@@ -170,8 +179,9 @@ final class ChatModel {
             let older = try await api.messages(chat.id, before: first.seq, limit: 50, invite: invite)
             hasOlder = older.count == 50
             merge(older)
+            isOffline = false
         } catch {
-            self.error = error.localizedDescription
+            isOffline = true
         }
     }
 

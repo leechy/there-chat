@@ -21,6 +21,8 @@ struct ChatView: View {
         content
             .background(Color.thereSurfaceMuted)
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
+            .safeAreaInset(edge: .top, spacing: 0) { offlineBanner }
+            .animation(.default, value: model.isOffline)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .task { model.start() }
@@ -67,7 +69,8 @@ struct ChatView: View {
                     if model.hasOlder && !model.messages.isEmpty {
                         ProgressView()
                             .padding()
-                            .task { await model.loadOlder() }
+                            // Retries when the connection comes back.
+                            .task(id: model.isOffline) { await model.loadOlder() }
                     }
                     ForEach(timeline) { item in
                         switch item {
@@ -150,6 +153,19 @@ struct ChatView: View {
             lastAuthor = author
         }
         return items
+    }
+
+    @ViewBuilder
+    private var offlineBanner: some View {
+        if model.isOffline {
+            Label("Can't reach the server. Retrying…", systemImage: "wifi.slash")
+                .font(.footnote)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .glassEffect(.regular, in: .capsule)
+                .padding(.top, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+        }
     }
 
     // MARK: Bottom bar

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -219,6 +220,7 @@ fun ChatScreen(chat: Chat, invite: String?) {
                 )
             }
         }
+        if (state.offline) OfflineBanner(Modifier.padding(padding))
     }
 
     namePurpose?.let { purpose ->
@@ -344,7 +346,7 @@ private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, 
                 Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
                 }
-                LaunchedEffect(Unit) { vm.loadOlder() }
+                LaunchedEffect(state.offline) { vm.loadOlder() } // retries when back online
             }
         }
     }
@@ -584,6 +586,20 @@ private fun BottomBar(
                     else -> "Join this chat"
                 },
             )
+        }
+    }
+}
+
+/** Non-blocking notice while the server can't be reached; the loaded messages stay readable. */
+@Composable
+private fun OfflineBanner(modifier: Modifier) {
+    Box(modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.TopCenter) {
+        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHighest, shadowElevation = 2.dp) {
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.CloudOff, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.size(8.dp))
+                Text("Can't reach the server. Retrying…", style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }
