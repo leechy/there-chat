@@ -9,6 +9,7 @@ import com.therechat.app.core.ApiClient
 import com.therechat.app.core.ApiException
 import com.therechat.app.core.BBox
 import com.therechat.app.core.Chat
+import com.therechat.app.core.Realtime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,14 +46,28 @@ class MapViewModel(app: Application) : AndroidViewModel(app) {
     private var chats: List<Chat> = emptyList()
     private var loadJob: Job? = null
 
+    init {
+        // Realtime events keep the counters (and the map, when chats change) current.
+        viewModelScope.launch {
+            Realtime.get(app).events.collect { event ->
+                when (event.type) {
+                    "resync", "chat_updated", "chat_deleted" -> refresh()
+                    else -> refreshCounters()
+                }
+            }
+        }
+    }
+
     /** Reloads chats in view and the "My Chats" counters, e.g. after coming back to the map. */
     fun refresh() {
         lastBounds?.let(::onCameraIdle)
-        viewModelScope.launch {
-            runCatching { api.myChats() }.onSuccess { mine ->
-                _state.update { s ->
-                    s.copy(myChatCount = mine.size, unread = mine.filter { it.me?.notify != false }.sumOf { it.unread })
-                }
+        viewModelScope.launch { refreshCounters() }
+    }
+
+    private suspend fun refreshCounters() {
+        runCatching { api.myChats() }.onSuccess { mine ->
+            _state.update { s ->
+                s.copy(myChatCount = mine.size, unread = mine.filter { it.me?.notify != false }.sumOf { it.unread })
             }
         }
     }

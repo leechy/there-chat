@@ -159,6 +159,15 @@ class ApiClient(
         call(HttpMethod.Post, "/v1/reports", enc(ReportRequest(chatId, messageId, reason)))
     }
 
+    // --- realtime ---
+
+    /** The `ws(s)://…/v1/ws` URL and the bearer secret, after making sure the device is registered. */
+    suspend fun webSocketTarget(): Pair<String, String> {
+        ensureRegistered()
+        val url = baseUrl.replaceFirst("https://", "wss://").replaceFirst("http://", "ws://") + "/v1/ws"
+        return url to identity.secret()
+    }
+
     // --- plumbing ---
 
     private inline fun <reified T> enc(value: T): String = json.encodeToString(value)
