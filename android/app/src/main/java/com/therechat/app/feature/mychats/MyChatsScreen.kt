@@ -51,6 +51,7 @@ import com.therechat.app.core.ApiClient
 import com.therechat.app.core.ChatKind
 import com.therechat.app.core.Member
 import com.therechat.app.core.MyChat
+import com.therechat.app.core.Realtime
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +59,7 @@ import kotlinx.coroutines.launch
 fun MyChatsScreen(title: String = "My Chats") {
     val nav = LocalNavigator.current
     val api = ApiClient.get(LocalContext.current)
+    val realtime = Realtime.get(LocalContext.current)
     val scope = rememberCoroutineScope()
     var chats by remember { mutableStateOf<List<MyChat>?>(null) }
     var kind by remember { mutableStateOf(ChatKind.CHAT) }
@@ -71,6 +73,7 @@ fun MyChatsScreen(title: String = "My Chats") {
             .onFailure { error = it.message; if (chats == null) chats = emptyList() }
     }
     LaunchedEffect(Unit) { load() }
+    LaunchedEffect(Unit) { realtime.events.collect { load() } }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),

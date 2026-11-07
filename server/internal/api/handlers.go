@@ -273,6 +273,11 @@ func (s *Server) joinChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.me = me
+	action := MemberJoined
+	if me.Status == store.StatusPending {
+		action = MemberPending
+	}
+	s.publish(r.Context(), Event{Type: EvMember, ChatID: a.chat.ID, MemberID: me.ID, Action: action}, "")
 	writeJSON(w, http.StatusOK, a.view())
 }
 
@@ -335,6 +340,11 @@ func (s *Server) postMessage(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
+	privateTo := ""
+	if msg.Status == "pending" {
+		privateTo = msg.MemberID // premoderated: only the author and admins know yet
+	}
+	s.publish(r.Context(), Event{Type: EvMessage, ChatID: a.chat.ID, Seq: msg.Seq, MessageID: msg.ID}, privateTo)
 	writeJSON(w, http.StatusCreated, msg)
 }
 

@@ -62,6 +62,7 @@ func (s *Server) updateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.chat = chat
+	s.publish(r.Context(), Event{Type: EvChatUpdated, ChatID: chat.ID}, "")
 	writeJSON(w, http.StatusOK, a.view())
 }
 
@@ -78,6 +79,7 @@ func (s *Server) deleteChat(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, err)
 		return
 	}
+	s.publish(r.Context(), Event{Type: EvChatDeleted, ChatID: a.chat.ID}, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -107,6 +109,7 @@ func (s *Server) leaveChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.me = me
+	s.publish(r.Context(), Event{Type: EvMember, ChatID: a.chat.ID, MemberID: me.ID, Action: MemberLeft}, "")
 	writeJSON(w, http.StatusOK, a.view())
 }
 
@@ -135,10 +138,14 @@ func (s *Server) updateMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "join_required", "join the chat first")
 		return
 	}
+	oldName := a.me.Name
 	me, err := s.store.UpdateMe(r.Context(), a.me, store.MeUpdate{Name: req.Name, Notify: req.Notify, LastReadSeq: req.LastReadSeq})
 	if err != nil {
 		s.storeError(w, r, err)
 		return
+	}
+	if me.Name != oldName {
+		s.publish(r.Context(), Event{Type: EvMember, ChatID: a.chat.ID, MemberID: me.ID, Action: MemberRenamed}, "")
 	}
 	a.me = me
 	writeJSON(w, http.StatusOK, a.view())
@@ -176,10 +183,11 @@ func (s *Server) memberAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var (
-		m   store.Member
-		err error
+		m      store.Member
+		err    error
+		action = r.PathValue("action")
 	)
-	switch action := r.PathValue("action"); {
+	switch {
 	case action == "approve" && target.Status == store.StatusPending:
 		m, err = s.store.SetMemberStatus(r.Context(), target, store.StatusActive, store.EventJoined)
 	case action == "reject" && target.Status == store.StatusPending:
@@ -203,7 +211,13 @@ func (s *Server) memberAction(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
+	s.publish(r.Context(), Event{Type: EvMember, ChatID: a.chat.ID, MemberID: m.ID, Action: memberEvent[action]}, "")
 	writeJSON(w, http.StatusOK, m)
+}
+
+var memberEvent = map[string]string{
+	"approve": MemberJoined, "reject": MemberRejected, "promote": MemberPromoted,
+	"demote": MemberDemoted, "block": MemberBlocked, "unblock": MemberUnblocked,
 }
 
 func (s *Server) deleteMemberMessages(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +233,7 @@ func (s *Server) deleteMemberMessages(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, err)
 		return
 	}
+	s.publish(r.Context(), Event{Type: EvMessageDeleted, ChatID: a.chat.ID, MemberID: target.ID}, "")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -293,6 +308,7 @@ func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, err)
 		return
 	}
+	s.publish(r.Context(), Event{Type: EvMessageDeleted, ChatID: a.chat.ID, Seq: msg.Seq, MessageID: msg.ID}, s.pendingAuthor(msg))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -323,7 +339,21 @@ func (s *Server) moderateMessage(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, r, err)
 		return
 	}
+	result := "rejected"
+	if action == "approve" {
+		result = "approved"
+	}
+	s.publish(r.Context(), Event{Type: EvModerated, ChatID: a.chat.ID, Seq: msg.Seq, MessageID: msg.ID, Action: result}, "")
 	writeJSON(w, http.StatusOK, msg)
+}
+
+// pendingAuthor returns the author of a still-pending message, whose events
+// stay between the author and the admins; "" for everything else.
+func (s *Server) pendingAuthor(msg store.Message) string {
+	if msg.Status == "pending" {
+		return msg.MemberID
+	}
+	return ""
 }
 
 func (s *Server) react(on bool) http.HandlerFunc {
@@ -354,6 +384,7 @@ func (s *Server) react(on bool) http.HandlerFunc {
 			s.internal(w, r, err)
 			return
 		}
+		s.publish(r.Context(), Event{Type: EvReaction, ChatID: a.chat.ID, Seq: msg.Seq, MessageID: msg.ID}, "")
 		writeJSON(w, http.StatusOK, msg)
 	}
 }

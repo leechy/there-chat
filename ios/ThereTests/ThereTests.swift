@@ -57,3 +57,17 @@ struct DecodingTests {
         #expect(m.authorRole == .admin)
     }
 }
+
+struct RealtimeTests {
+    @Test func decodesEvents() throws {
+        let event = try #require(RealtimeEvent.decode(#"{"type":"message","chat_id":"c1","seq":42,"message_id":"m1"}"#))
+        #expect(event == RealtimeEvent(type: "message", chatId: "c1", seq: 42, messageId: "m1"))
+        #expect(RealtimeEvent.decode("not json") == nil)
+    }
+
+    @Test func backoffDoublesUpToThirtySeconds() {
+        #expect(Realtime.backoff(attempt: 0) == 1)
+        #expect(Realtime.backoff(attempt: 3) == 8)
+        #expect(Realtime.backoff(attempt: 10) == 30)
+    }
+}

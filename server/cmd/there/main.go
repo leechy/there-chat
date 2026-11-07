@@ -41,11 +41,13 @@ func run(log *slog.Logger) error {
 	defer st.Close()
 
 	span, _ := strconv.ParseFloat(env("THERE_MAX_SPAN", "0"), 64)
+	handler := api.New(st, api.Config{MaxSpanDeg: span}, log)
 	srv := &http.Server{
 		Addr:              env("THERE_ADDR", "127.0.0.1:8080"),
-		Handler:           api.New(st, api.Config{MaxSpanDeg: span}, log),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	srv.RegisterOnShutdown(handler.Close) // WebSockets are hijacked; Shutdown doesn't wait for them
 
 	errc := make(chan error, 1)
 	go func() {

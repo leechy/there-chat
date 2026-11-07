@@ -9,6 +9,8 @@ import com.therechat.app.core.Chat
 import com.therechat.app.core.ChatKind
 import com.therechat.app.core.Member
 import com.therechat.app.core.Message
+import com.therechat.app.core.Realtime
+import com.therechat.app.core.RealtimeEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,29 +41,70 @@ data class ChatUiState(
 }
 
 /**
- * One open chat. Polls the newest page every few seconds while visible and
- * merges it, which also picks up reactions, deletions and moderation.
+ * One open chat. Realtime events nudge it to refetch through REST, which
+ * stays the source of truth. While the socket is down, or the chat is only
+ * read without membership (no events for those), it polls every 3 seconds.
  */
 class ChatViewModel(app: Application, chat: Chat, private val invite: String?) : AndroidViewModel(app) {
     private val api = ApiClient.get(app)
     private val _state = MutableStateFlow(ChatUiState(chat))
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
+    private val realtime = Realtime.get(app)
     private var poll: Job? = null
+    private var events: Job? = null
+    private var lastRefresh = 0L
+    private var wanted = 0
+    private var refetching = false
 
     private val chatId get() = _state.value.chat.id
 
+    /** True when events for this chat arrive over the socket, so polling can rest. */
+    private val isLive: Boolean
+        get() {
+            val s = _state.value
+            return realtime.connected.value && (s.chat.isMember || s.me?.status == Member.Status.PENDING)
+        }
+
     fun start() {
         if (poll?.isActive == true) return
+        events = viewModelScope.launch {
+            realtime.events.collect { refetch(refetchFor(it, chatId, _state.value.lastSeq)) }
+        }
         poll = viewModelScope.launch {
+            refetch(REFETCH_ALL)
             while (true) {
-                refreshChat()
-                loadLatest()
                 delay(3_000)
+                // Fallback polling; a slow safety net even while live.
+                if (!isLive || System.currentTimeMillis() - lastRefresh > 60_000) refetch(REFETCH_ALL)
             }
         }
     }
 
-    fun stop() { poll?.cancel() }
+    fun stop() {
+        poll?.cancel()
+        events?.cancel()
+    }
+
+    /** Runs the requested refetches, merging requests that arrive meanwhile. */
+    private fun refetch(what: Int) {
+        wanted = wanted or what
+        if (refetching || wanted == 0) return
+        refetching = true
+        viewModelScope.launch {
+            try {
+                while (wanted != 0) {
+                    val now = wanted
+                    wanted = 0
+                    if (now and REFETCH_CHAT != 0) refreshChat()
+                    if (now and REFETCH_LATEST != 0 || _state.value.lastSeq == 0L) loadLatest()
+                    else if (now and REFETCH_NEWER != 0) loadNewer()
+                }
+                lastRefresh = System.currentTimeMillis()
+            } finally {
+                refetching = false
+            }
+        }
+    }
 
     fun clearError() = _state.update { it.copy(error = null) }
 
@@ -72,7 +115,7 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
         } catch (e: ApiException) {
             if (e.error.code == "not_found" || e.error.code == "forbidden") {
                 _state.update { it.copy(gone = true, error = if (e.error.code == "forbidden") "You can't access this chat anymore." else "This chat doesn't exist anymore.") }
-                poll?.cancel()
+                stop()
             }
         } catch (e: CancellationException) {
             throw e
@@ -90,6 +133,22 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
             }
             if (s.messages.isEmpty()) _state.update { it.copy(hasOlder = latest.size == 50) }
             merge(latest)
+            markRead()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _state.update { it.copy(error = e.message) }
+        }
+    }
+
+    /** Fetches everything after the last known message. */
+    private suspend fun loadNewer() {
+        if (!_state.value.canRead) return
+        try {
+            do {
+                val page = api.messages(chatId, after = _state.value.lastSeq, limit = 100, invite = invite)
+                merge(page)
+            } while (page.size == 100)
             markRead()
         } catch (e: CancellationException) {
             throw e
@@ -207,6 +266,22 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
     }
 
     suspend fun suggestedNames(): List<String> = runCatching { api.suggestedNames(6) }.getOrDefault(emptyList())
+
+    companion object {
+        const val REFETCH_CHAT = 1 // header, settings, my membership
+        const val REFETCH_NEWER = 2 // messages after lastSeq
+        const val REFETCH_LATEST = 4 // newest page, picks up edits
+        const val REFETCH_ALL = REFETCH_CHAT or REFETCH_LATEST
+
+        /** What to refetch for an event; 0 when it doesn't concern this chat. */
+        fun refetchFor(event: RealtimeEvent, chatId: String, lastSeq: Long): Int = when {
+            event.type == RealtimeEvent.RESYNC.type -> REFETCH_ALL
+            event.chatId != chatId -> 0
+            event.type == "message" -> if ((event.seq ?: Long.MAX_VALUE) > lastSeq) REFETCH_NEWER else 0
+            event.type in setOf("reaction", "message_deleted", "moderated") -> REFETCH_LATEST
+            else -> REFETCH_ALL // member, chat_updated, chat_deleted
+        }
+    }
 
     private fun launchCatching(block: suspend () -> Unit) = viewModelScope.launch {
         try {

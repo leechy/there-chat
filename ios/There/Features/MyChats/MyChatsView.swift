@@ -45,6 +45,9 @@ struct MyChatsView: View {
         .navigationBarTitleDisplayMode(.large)
         .refreshable { await load() }
         .task { await load() }
+        .task {
+            for await _ in Realtime.shared.events() { await load() }
+        }
     }
 
     private func load() async {

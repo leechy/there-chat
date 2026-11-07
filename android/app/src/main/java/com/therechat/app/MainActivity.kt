@@ -21,6 +21,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.therechat.app.core.ApiClient
+import com.therechat.app.core.Realtime
 import com.therechat.app.feature.chat.ChatScreen
 import com.therechat.app.feature.chatinfo.ChatInfoScreen
 import com.therechat.app.feature.map.MapHomeScreen
@@ -70,6 +71,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // The realtime socket lives only while the app is in the foreground.
+    override fun onStart() {
+        super.onStart()
+        Realtime.get(this).start()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Realtime.get(this).stop()
     }
 
     override fun onNewIntent(intent: Intent) {

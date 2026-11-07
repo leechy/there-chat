@@ -47,6 +47,7 @@ struct MapHomeView: View {
         .mapScope(mapScope)
         .toolbarVisibility(.hidden, for: .navigationBar)
         .onAppear { model.refresh() }
+        .task { await model.listen() }
         .task {
             // Asks for "when in use" permission the first time and keeps it
             // active while the map is on screen.

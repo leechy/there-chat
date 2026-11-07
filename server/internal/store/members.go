@@ -124,3 +124,31 @@ func nameFree(ctx context.Context, tx *sql.Tx, chatID, name, exceptMemberID stri
 	}
 	return nil
 }
+
+// Listener is an active member who should hear about changes in a chat.
+type Listener struct {
+	DeviceID string
+	MemberID string
+	Admin    bool
+}
+
+// Listeners returns the active members of a chat with their devices, for
+// realtime fan-out. Pending, left and blocked members are not included.
+func (s *Store) Listeners(ctx context.Context, chatID string) ([]Listener, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT device_id, id, role IN ('owner', 'admin') FROM members
+		WHERE chat_id = ? AND status = 'active'`, chatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Listener
+	for rows.Next() {
+		var l Listener
+		if err := rows.Scan(&l.DeviceID, &l.MemberID, &l.Admin); err != nil {
+			return nil, err
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}

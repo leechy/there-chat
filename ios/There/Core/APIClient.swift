@@ -174,6 +174,19 @@ actor APIClient {
         try await sendEmpty("POST", "/v1/reports", body: Body(chatId: chatID, messageId: messageID, reason: reason))
     }
 
+    // MARK: Realtime
+
+    /// The authenticated request for the `GET /v1/ws` socket.
+    func webSocketRequest() async throws -> URLRequest {
+        try await ensureRegistered()
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        components.scheme = components.scheme == "https" ? "wss" : "ws"
+        components.path = "/v1/ws"
+        var request = URLRequest(url: components.url!)
+        request.setValue("Bearer \(try DeviceIdentity.secret())", forHTTPHeaderField: "Authorization")
+        return request
+    }
+
     // MARK: Plumbing
 
     private struct Empty: Codable {}

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"there-chat.com/server/internal/store"
 )
@@ -17,6 +18,8 @@ type Config struct {
 	// MaxSpanDeg is the largest map area (in degrees of latitude and of
 	// longitude) for which chats are returned. Bigger areas get "zoom_in".
 	MaxSpanDeg float64
+	// PingInterval is how often WebSocket clients are pinged (default 25s).
+	PingInterval time.Duration
 }
 
 type Server struct {
@@ -24,13 +27,17 @@ type Server struct {
 	cfg   Config
 	log   *slog.Logger
 	mux   *http.ServeMux
+	hub   *hub
 }
 
 func New(st *store.Store, cfg Config, log *slog.Logger) *Server {
 	if cfg.MaxSpanDeg == 0 {
 		cfg.MaxSpanDeg = 0.04
 	}
-	s := &Server{store: st, cfg: cfg, log: log, mux: http.NewServeMux()}
+	if cfg.PingInterval == 0 {
+		cfg.PingInterval = defaultPingInterval
+	}
+	s := &Server{store: st, cfg: cfg, log: log, mux: http.NewServeMux(), hub: newHub()}
 	s.routes()
 	return s
 }
@@ -52,6 +59,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/chats/{id}/join", s.auth(s.joinChat))
 	s.mux.HandleFunc("GET /v1/chats/{id}/messages", s.auth(s.listMessages))
 	s.mux.HandleFunc("POST /v1/chats/{id}/messages", s.auth(s.postMessage))
+	s.mux.HandleFunc("GET /v1/ws", s.auth(s.websocket))
 	s.chatRoutes()
 }
 
