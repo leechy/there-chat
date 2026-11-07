@@ -113,12 +113,12 @@ fun NameSheet(
     }
 }
 
-private val ReportReasons = listOf("Spam", "Harassment or hate", "Violence or threats", "Sexual content", "Illegal activity")
+private val ReportReasons = listOf("Child safety", "Spam", "Harassment or hate", "Violence or threats", "Sexual content", "Illegal activity")
 
 /** Abuse report for a message or a whole chat; goes to the operators. */
 @Composable
 fun ReportDialog(onDismiss: () -> Unit, send: (String) -> Unit) {
-    var reason by remember { mutableStateOf(ReportReasons.first()) }
+    var reason by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Report") },
@@ -141,7 +141,9 @@ fun ReportDialog(onDismiss: () -> Unit, send: (String) -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { send(reason); onDismiss() }) { Text("Send") } },
+        confirmButton = {
+            TextButton(onClick = { reason?.let(send); onDismiss() }, enabled = reason != null) { Text("Send") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

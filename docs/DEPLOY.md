@@ -96,10 +96,17 @@ Firebase Dynamic Links закрыты (август 2025), поэтому всё
 - Upload key: `android/upload-keystore.jks`, пароль и алиас лежат в `android/keystore.properties`.
   Оба файла в git не попадают, их резервная копия хранится в менеджере паролей. Если ключ
   потерян, его можно заменить через поддержку Play, но на это уходят дни.
-- SHA-1 upload key: `4A:B5:42:02:DD:EF:C1:9E:23:F4:BF:61:57:2D:09:EC:0D:4C:15:92`.
-  После первой загрузки Play переподписывает сборки своим ключом (Play App Signing). Его
-  SHA-1 есть в Play Console → Test and release → App integrity. Оба SHA-1 нужно добавить
-  в ограничения ключа Google Maps, иначе в релизной сборке карта будет пустой.
+- Play переподписывает сборки своим ключом (Play App Signing, Play Console → Test and
+  release → App integrity). Все SHA-1 ниже должны быть в ограничениях ключа Google Maps
+  вместе с пакетом `com.therechat.app`, иначе карта будет пустой:
+
+  | Ключ | SHA-1 |
+  |---|---|
+  | Play App Signing (основной) | `66:9F:E4:10:E4:05:DB:EC:14:93:DF:FA:B8:C8:69:E8:77:50:1C:80` |
+  | Play, дополнительный | `C3:EB:B9:26:13:A7:88:B9:64:3A:11:E1:2A:B2:7D:F5:DC:29:EE:7C` |
+  | Play, дополнительный | `B3:4C:64:24:98:FC:77:9E:34:2A:A8:22:B2:13:8F:F0:86:23:C1:AE` |
+  | Upload key | `4A:B5:42:02:DD:EF:C1:9E:23:F4:BF:61:57:2D:09:EC:0D:4C:15:92` |
+  | Debug (этот мак) | `E4:69:27:23:09:5F:2A:C1:5C:1C:0E:24:A1:F5:41:DD:3D:E6:64:25` |
 - Сборка: `cd android && ./gradlew :app:bundleRelease`, на выходе
   `app/build/outputs/bundle/release/app-release.aab`. Перед каждой загрузкой нужно
   увеличивать `versionCode` в `app/build.gradle.kts`.

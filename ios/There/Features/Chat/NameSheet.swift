@@ -170,7 +170,7 @@ struct ReportSheet: View {
     @State private var reason = ""
     @Environment(\.dismiss) private var dismiss
 
-    private static let presets = ["Spam", "Harassment or hate", "Violence or threats", "Sexual content", "Illegal activity"]
+    private static let presets = ["Child safety", "Spam", "Harassment or hate", "Violence or threats", "Sexual content", "Illegal activity"]
 
     var body: some View {
         NavigationStack {
