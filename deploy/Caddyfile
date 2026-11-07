@@ -1,0 +1,19 @@
+# Caddy gets and renews HTTPS certificates for every site below automatically,
+# as soon as the DNS records point at this server.
+
+api.there-chat.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}
+
+there-chat.com {
+	encode zstd gzip
+	root * /var/www/there
+	file_server
+}
+
+www.there-chat.com {
+	redir https://there-chat.com{uri} permanent
+}
+
+# admin.there-chat.com: added together with the admin console (docs/DEPLOY.md, section 5).

@@ -1,0 +1,24 @@
+[Unit]
+Description=There API server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=there
+Group=there
+Environment=THERE_ADDR=127.0.0.1:8080
+Environment=THERE_DB=/var/lib/there/there.db
+ExecStart=/opt/there/there
+Restart=always
+RestartSec=2
+LimitNOFILE=65536
+
+# Hardening: the process can write only its database folder.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/there
+
+[Install]
+WantedBy=multi-user.target
