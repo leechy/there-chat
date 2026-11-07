@@ -300,12 +300,14 @@ private fun timeline(messages: List<Message>): List<Item> {
 
 @Composable
 private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, report: (Message) -> Unit) {
-    val items = remember(state.messages, state.outbox) { timeline(state.messages + state.outbox) }
+    // Newest first with reverseLayout: the list stays anchored to the bottom when the
+    // keyboard opens or a message grows (reactions), like a native chat.
+    val items = remember(state.messages, state.outbox) { timeline(state.messages + state.outbox).asReversed() }
     val list = rememberLazyListState()
 
-    // Stick to the bottom when new messages arrive.
-    LaunchedEffect(items.size) {
-        if (items.isNotEmpty()) list.animateScrollToItem(items.lastIndex)
+    // Show new messages if the reader was already at the bottom.
+    LaunchedEffect(items.firstOrNull()?.key) {
+        if (list.firstVisibleItemIndex <= 1) list.animateScrollToItem(0)
     }
 
     if (items.isEmpty()) {
@@ -317,17 +319,10 @@ private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, 
     LazyColumn(
         state = list,
         modifier = modifier.fillMaxSize(),
+        reverseLayout = true,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (state.hasOlder && state.messages.isNotEmpty()) {
-            item(key = "older") {
-                Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                }
-                LaunchedEffect(Unit) { vm.loadOlder() }
-            }
-        }
         items(items, key = { it.key }) { item ->
             when (item) {
                 is Item.Day -> Text(
@@ -341,6 +336,15 @@ private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, 
                 } else {
                     MessageBubble(item.message, item.showAuthor, state, vm, report)
                 }
+            }
+        }
+        // Last in a reversed list = shown at the top.
+        if (state.hasOlder && state.messages.isNotEmpty()) {
+            item(key = "older") {
+                Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+                LaunchedEffect(Unit) { vm.loadOlder() }
             }
         }
     }

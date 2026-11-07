@@ -103,6 +103,8 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
         )
     }
     var openCluster by remember { mutableStateOf<ChatCluster?>(null) }
+    // CameraUpdateFactory only works once the map is initialised.
+    var mapLoaded by remember { mutableStateOf(false) }
 
     @SuppressLint("MissingPermission")
     suspend fun centerOnUser() {
@@ -110,7 +112,9 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
         val location = runCatching {
             LocationServices.getFusedLocationProviderClient(context).lastLocation.await()
         }.getOrNull() ?: return
-        camera.animate(CameraUpdateFactory.newLatLngZoom(LatLng(location.latitude, location.longitude), 16f))
+        val here = LatLng(location.latitude, location.longitude)
+        if (mapLoaded) camera.animate(CameraUpdateFactory.newLatLngZoom(here, 16f))
+        else camera.position = CameraPosition.fromLatLngZoom(here, 16f)
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -138,6 +142,7 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = camera,
             properties = MapProperties(isMyLocationEnabled = hasLocation),
+            onMapLoaded = { mapLoaded = true },
             uiSettings = MapUiSettings(
                 zoomControlsEnabled = false,
                 myLocationButtonEnabled = false,
@@ -181,11 +186,11 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 3.dp) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        IconButton(onClick = { scope.launch { camera.animate(CameraUpdateFactory.zoomIn()) } }) {
+                        IconButton(onClick = { if (mapLoaded) scope.launch { camera.animate(CameraUpdateFactory.zoomIn()) } }) {
                             Icon(Icons.Outlined.Add, stringResource(R.string.zoom_in))
                         }
                         ZoomScale(state.zoomProgress, Modifier.width(6.dp).height(64.dp))
-                        IconButton(onClick = { scope.launch { camera.animate(CameraUpdateFactory.zoomOut()) } }) {
+                        IconButton(onClick = { if (mapLoaded) scope.launch { camera.animate(CameraUpdateFactory.zoomOut()) } }) {
                             Icon(Icons.Outlined.Remove, stringResource(R.string.zoom_out))
                         }
                     }
