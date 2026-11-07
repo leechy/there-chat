@@ -15,6 +15,7 @@ object ThereColors {
     val Secondary = Color(0xFF949BB4)
     val SurfaceMuted = Color(0xFFF2F4FA)
     val Reaction = Color(0xFFFFF9E4)
+    val ReactionBorder = Color(0xFFEBD9A6)
     val Danger = Color(0xFFC41111)
 }
 

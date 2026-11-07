@@ -52,6 +52,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/chats/{id}/join", s.auth(s.joinChat))
 	s.mux.HandleFunc("GET /v1/chats/{id}/messages", s.auth(s.listMessages))
 	s.mux.HandleFunc("POST /v1/chats/{id}/messages", s.auth(s.postMessage))
+	s.chatRoutes()
 }
 
 // --- auth ---

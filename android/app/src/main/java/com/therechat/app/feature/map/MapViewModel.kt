@@ -9,7 +9,6 @@ import com.therechat.app.core.ApiClient
 import com.therechat.app.core.ApiException
 import com.therechat.app.core.BBox
 import com.therechat.app.core.Chat
-import com.therechat.app.core.DeviceIdentity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,17 +32,33 @@ data class MapUiState(
     /** 0 = at the threshold where chats appear, 1 = street level, < 0 = hidden. */
     val zoomProgress: Float = -1f,
     val error: String? = null,
+    val unread: Long = 0,
+    val myChatCount: Int = 0,
 )
 
 class MapViewModel(app: Application) : AndroidViewModel(app) {
-    private val api = ApiClient(DeviceIdentity(app))
+    private val api = ApiClient.get(app)
+    private var lastBounds: LatLngBounds? = null
     private val _state = MutableStateFlow(MapUiState())
     val state: StateFlow<MapUiState> = _state.asStateFlow()
 
     private var chats: List<Chat> = emptyList()
     private var loadJob: Job? = null
 
+    /** Reloads chats in view and the "My Chats" counters, e.g. after coming back to the map. */
+    fun refresh() {
+        lastBounds?.let(::onCameraIdle)
+        viewModelScope.launch {
+            runCatching { api.myChats() }.onSuccess { mine ->
+                _state.update { s ->
+                    s.copy(myChatCount = mine.size, unread = mine.filter { it.me?.notify != false }.sumOf { it.unread })
+                }
+            }
+        }
+    }
+
     fun onCameraIdle(bounds: LatLngBounds) {
+        lastBounds = bounds
         val latSpan = bounds.northeast.latitude - bounds.southwest.latitude
         val lngSpan = bounds.northeast.longitude - bounds.southwest.longitude
         val span = max(latSpan, lngSpan)

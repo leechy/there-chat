@@ -8,7 +8,7 @@ struct MapHomeView: View {
         fallback: .region(.init(center: .init(latitude: 48.8530, longitude: 2.3499),
                                 latitudinalMeters: 1200, longitudinalMeters: 1200)))
     @State private var openCluster: ChatCluster?
-    @State private var openChat: Chat?
+    @Environment(Router.self) private var router
     @State private var locationSession: CLServiceSession?
     @Namespace private var mapScope
 
@@ -20,7 +20,7 @@ struct MapHomeView: View {
                            coordinate: cluster.coordinate, anchor: .bottom) {
                     ChatMarker(cluster: cluster) {
                         if cluster.chats.count == 1 {
-                            openChat = cluster.chats[0]
+                            router.open(.chat(cluster.chats[0]))
                         } else {
                             openCluster = cluster
                         }
@@ -28,7 +28,7 @@ struct MapHomeView: View {
                     .popover(item: clusterBinding(cluster)) { cluster in
                         ClusterList(cluster: cluster) { chat in
                             openCluster = nil
-                            openChat = chat
+                            router.open(.chat(chat))
                         }
                         .presentationCompactAdaptation(.popover)
                     }
@@ -46,10 +46,7 @@ struct MapHomeView: View {
         .overlay(alignment: .bottom) { bottomBar }
         .mapScope(mapScope)
         .toolbarVisibility(.hidden, for: .navigationBar)
-        .navigationDestination(item: $openChat) { chat in
-            Text("\(chat.emoji) \(chat.title)")
-                .navigationTitle(chat.title)
-        }
+        .onAppear { model.refresh() }
         .task {
             // Asks for "when in use" permission the first time and keeps it
             // active while the map is on screen.
@@ -67,9 +64,22 @@ struct MapHomeView: View {
 
     private var topBar: some View {
         HStack {
-            Button("Settings", systemImage: "gearshape") {}
+            Button("Settings", systemImage: "gearshape") { router.showSettings = true }
             Spacer()
-            Button("Notifications", systemImage: "bell") {}
+            Button("Notifications", systemImage: "bell") { router.open(.notifications) }
+                .overlay(alignment: .topTrailing) {
+                    if model.unread > 0 {
+                        Text(model.unread > 99 ? "99+" : "\(model.unread)")
+                            .font(.caption2.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(Color.thereDanger, in: .capsule)
+                            .offset(x: 4, y: -4)
+                            .allowsHitTesting(false)
+                    }
+                }
         }
         .labelStyle(.iconOnly)
         .font(.title3)
@@ -118,11 +128,20 @@ struct MapHomeView: View {
                     .glassEffect(.regular, in: .capsule)
             }
             HStack {
-                Button("New Chat", systemImage: "plus.bubble") {}
+                Button("New Chat", systemImage: "plus.bubble") { router.showNewChat = true }
                     .buttonStyle(.glassProminent)
                 Spacer()
-                Button("My Chats", systemImage: "bubble.left.and.bubble.right") {}
-                    .buttonStyle(.glass)
+                Button { router.open(.myChats) } label: {
+                    Label("My Chats", systemImage: "bubble.left.and.bubble.right")
+                    if model.myChatCount > 0 {
+                        Text("\(model.myChatCount)")
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                            .padding(.horizontal, 6)
+                            .background(Color.thereSecondary.opacity(0.25), in: .capsule)
+                    }
+                }
+                .buttonStyle(.glass)
             }
             .controlSize(.large)
             .font(.headline)
@@ -237,4 +256,5 @@ private struct ClusterList: View {
 
 #Preview {
     NavigationStack { MapHomeView() }
+        .environment(Router())
 }

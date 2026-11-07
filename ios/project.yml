@@ -38,6 +38,9 @@ targets:
         ThereAPIBaseURL: $(THERE_API_BASE_URL)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.there-chat.app
+            CFBundleURLSchemes: [there]
   ThereTests:
     type: bundle.unit-test
     platform: iOS

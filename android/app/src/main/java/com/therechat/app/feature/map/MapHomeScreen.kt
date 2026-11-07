@@ -75,7 +75,11 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberUpdatedMarkerState
+import com.therechat.app.LocalNavigator
 import com.therechat.app.R
+import com.therechat.app.Screen
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import com.therechat.app.core.Chat
 import com.therechat.app.core.ChatKind
 import kotlinx.coroutines.launch
@@ -87,6 +91,8 @@ private val Paris = LatLng(48.8530, 2.3499)
 @Composable
 fun MapHomeScreen(vm: MapViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val nav = LocalNavigator.current
+    LaunchedEffect(nav.top) { if (nav.top == Screen.Map) vm.refresh() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val camera = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(Paris, 16f) }
@@ -145,7 +151,8 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
                     state = rememberUpdatedMarkerState(position = cluster.position),
                     title = cluster.chats.singleOrNull()?.title,
                     onClick = {
-                        openCluster = cluster
+                        val single = cluster.chats.singleOrNull()
+                        if (single != null) nav.open(Screen.ChatScreen(single)) else openCluster = cluster
                         true
                     },
                 ) {
@@ -157,9 +164,13 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
         Box(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
             // Top bar
             Row(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
-                MapButton(Icons.Outlined.Settings, stringResource(R.string.settings)) {}
+                MapButton(Icons.Outlined.Settings, stringResource(R.string.settings)) { nav.open(Screen.Settings) }
                 Spacer(Modifier.weight(1f))
-                MapButton(Icons.Outlined.Notifications, stringResource(R.string.notifications)) {}
+                BadgedBox(badge = {
+                    if (state.unread > 0) Badge { Text(if (state.unread > 99) "99+" else "${state.unread}") }
+                }) {
+                    MapButton(Icons.Outlined.Notifications, stringResource(R.string.notifications)) { nav.open(Screen.Notifications) }
+                }
             }
 
             // Zoom controls
@@ -209,7 +220,7 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
                 }
                 Row(Modifier.fillMaxWidth()) {
                     ExtendedFloatingActionButton(
-                        onClick = {},
+                        onClick = { nav.open(Screen.NewChat) },
                         icon = { Icon(Icons.Outlined.AddComment, null) },
                         text = { Text(stringResource(R.string.new_chat)) },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -217,9 +228,9 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
                     )
                     Spacer(Modifier.weight(1f))
                     ExtendedFloatingActionButton(
-                        onClick = {},
+                        onClick = { nav.open(Screen.MyChats) },
                         icon = { Icon(Icons.AutoMirrored.Outlined.Chat, null) },
-                        text = { Text(stringResource(R.string.my_chats)) },
+                        text = { Text(if (state.myChatCount > 0) "${stringResource(R.string.my_chats)} · ${state.myChatCount}" else stringResource(R.string.my_chats)) },
                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     )
                 }
@@ -244,7 +255,7 @@ fun MapHomeScreen(vm: MapViewModel = viewModel()) {
                         trailingContent = {
                             if (chat.kind == ChatKind.CHANNEL) Icon(Icons.Outlined.Campaign, null)
                         },
-                        modifier = Modifier.clickable { openCluster = null /* TODO: open chat */ },
+                        modifier = Modifier.clickable { openCluster = null; nav.open(Screen.ChatScreen(chat)) },
                     )
                     HorizontalDivider()
                 }

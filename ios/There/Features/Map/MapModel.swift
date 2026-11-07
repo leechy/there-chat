@@ -25,6 +25,8 @@ final class MapModel {
     private(set) var tooFar = false
     private(set) var error: String?
     private(set) var region: MKCoordinateRegion?
+    private(set) var unread = 0
+    private(set) var myChatCount = 0
 
     /// How far into the "chats visible" zoom range we are: 0 = just at the
     /// threshold, 1 = street level. Negative means chats are hidden.
@@ -40,6 +42,17 @@ final class MapModel {
 
     init(api: APIClient = .shared) {
         self.api = api
+    }
+
+    /// Reloads chats in view and the "My Chats" counters, e.g. when coming
+    /// back to the map after creating or leaving a chat.
+    func refresh() {
+        if let region { regionChanged(region) }
+        Task {
+            guard let mine = try? await api.myChats() else { return }
+            myChatCount = mine.count
+            unread = Int(mine.filter { $0.chat.me?.notify != false }.map(\.unread).reduce(0, +))
+        }
     }
 
     func regionChanged(_ region: MKCoordinateRegion) {

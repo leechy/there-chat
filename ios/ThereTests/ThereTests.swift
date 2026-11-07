@@ -26,3 +26,34 @@ struct ThereTests {
         #expect(chat.me == nil)
     }
 }
+
+struct DecodingTests {
+    private let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.keyDecodingStrategy = .convertFromSnakeCase
+        return d
+    }()
+
+    @Test func myChatFlattensChatAndCounters() throws {
+        let json = """
+        {"id":"abc","kind":"channel","title":"News","emoji":"📰","lat":1,"lng":2,"free_join":true,
+         "premoderated":false,"visible":true,"created_at":1,"last_seq":7,"unread":3,"member_count":2,
+         "me":{"id":"m1","chat_id":"abc","name":"Neo","role":"owner","status":"active","notify":true,
+               "last_read_seq":4,"created_at":1,"updated_at":1}}
+        """
+        let item = try decoder.decode(MyChat.self, from: Data(json.utf8))
+        #expect(item.chat.kind == .channel)
+        #expect(item.unread == 3)
+        #expect(item.chat.isAdmin)
+    }
+
+    @Test func reactionMineDefaultsToFalse() throws {
+        let json = """
+        {"id":"x","chat_id":"c","seq":1,"member_id":"m","author_name":"A","author_role":"admin","kind":"text",
+         "body":"hi","status":"published","created_at":1,"reactions":[{"emoji":"🔥","count":2},{"emoji":"👍","count":1,"mine":true}]}
+        """
+        let m = try decoder.decode(Message.self, from: Data(json.utf8))
+        #expect(m.reactions?.map(\.mine) == [false, true])
+        #expect(m.authorRole == .admin)
+    }
+}

@@ -72,5 +72,8 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
 
+    implementation(libs.emoji.picker)
+    implementation(libs.zxing.core)
+
     testImplementation(libs.junit)
 }
