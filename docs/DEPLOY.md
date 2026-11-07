@@ -91,6 +91,19 @@ Firebase Dynamic Links закрыты (август 2025), поэтому всё
 - Сервер: очередь отправки, учёт `notify` по каждому участию, удаление невалидных токенов.
   Код ещё не написан.
 
+## Сборка Android для Google Play
+
+- Upload key: `android/upload-keystore.jks`, пароль и алиас лежат в `android/keystore.properties`.
+  Оба файла в git не попадают, их резервная копия хранится в менеджере паролей. Если ключ
+  потерян, его можно заменить через поддержку Play, но на это уходят дни.
+- SHA-1 upload key: `4A:B5:42:02:DD:EF:C1:9E:23:F4:BF:61:57:2D:09:EC:0D:4C:15:92`.
+  После первой загрузки Play переподписывает сборки своим ключом (Play App Signing). Его
+  SHA-1 есть в Play Console → Test and release → App integrity. Оба SHA-1 нужно добавить
+  в ограничения ключа Google Maps, иначе в релизной сборке карта будет пустой.
+- Сборка: `cd android && ./gradlew :app:bundleRelease`, на выходе
+  `app/build/outputs/bundle/release/app-release.aab`. Перед каждой загрузкой нужно
+  увеличивать `versionCode` в `app/build.gradle.kts`.
+
 ## 4. Доработки сервера и приложений до выхода
 
 - [ ] Rate limiting: регистрация устройств, отправка сообщений, создание чатов, вступления.

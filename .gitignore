@@ -25,3 +25,8 @@ android/.kotlin/
 # secrets (APNs key, service accounts)
 *.p8
 *-service-account*.json
+
+# Android release signing (back up outside git!)
+*.jks
+*.keystore
+android/keystore.properties
