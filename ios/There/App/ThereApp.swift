@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct ThereApp: App {
     @State private var router = Router()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -24,6 +25,14 @@ struct ThereApp: App {
             .environment(router)
             .tint(Color.accentColor)
             .onOpenURL { router.handle($0) }
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                // The realtime socket lives only while the app is in the foreground.
+                switch phase {
+                case .active: Realtime.shared.start()
+                case .background: Realtime.shared.stop()
+                default: break
+                }
+            }
             .fullScreenCover(isPresented: $router.showNewChat) {
                 NewChatView()
                     .environment(router)

@@ -48,10 +48,25 @@ final class MapModel {
     /// back to the map after creating or leaving a chat.
     func refresh() {
         if let region { regionChanged(region) }
-        Task {
-            guard let mine = try? await api.myChats() else { return }
-            myChatCount = mine.count
-            unread = Int(mine.filter { $0.chat.me?.notify != false }.map(\.unread).reduce(0, +))
+        Task { await refreshCounters() }
+    }
+
+    private func refreshCounters() async {
+        guard let mine = try? await api.myChats() else { return }
+        myChatCount = mine.count
+        unread = Int(mine.filter { $0.chat.me?.notify != false }.map(\.unread).reduce(0, +))
+    }
+
+    /// Keeps the My Chats counters (and the map, when chats change) current
+    /// from realtime events. Runs until the calling task is cancelled.
+    func listen(to realtime: Realtime = .shared) async {
+        for await event in realtime.events() {
+            switch event.type {
+            case "resync", "chat_updated", "chat_deleted":
+                refresh()
+            default:
+                await refreshCounters()
+            }
         }
     }
 
