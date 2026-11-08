@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var erasing = false
     @State private var eraseError: String?
     @State private var server: ServerStatus?
+    @State private var host = ""
+    @State private var serverURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -40,12 +42,23 @@ struct SettingsView: View {
                     Text("Deletes your messages, reactions and names in every chat, removes you from your chats and deletes the chats you created. This can't be undone.")
                 }
                 Section {
+                    if !APIClient.servers.isEmpty {
+                        Picker("Connect to", selection: $serverURL) {
+                            ForEach(APIClient.servers, id: \.url) { server in
+                                Text(server.name).tag(Optional(server.url))
+                            }
+                        }
+                        .onChange(of: serverURL) { old, new in
+                            guard let new, old != nil else { return }
+                            Task { await switchServer(to: new) }
+                        }
+                    }
                     Button { Task { await checkServer() } } label: {
                         LabeledContent("Server") { ServerStatusText(status: server) }
                     }
                     .foregroundStyle(Color.primary)
                 } footer: {
-                    Text("\(APIClient.shared.host) · tap to check again")
+                    Text("\(host) · tap to check again")
                 }
                 Section {
                     LabeledContent("Version",
@@ -80,7 +93,19 @@ struct SettingsView: View {
 extension SettingsView {
     private func checkServer() async {
         server = nil
+        host = await APIClient.shared.host
+        if serverURL == nil { serverURL = await APIClient.shared.baseURL }
         server = await APIClient.shared.serverStatus()
+    }
+
+    /// Debug builds only: talk to another server with the same device key.
+    private func switchServer(to url: URL) async {
+        await APIClient.shared.use(url)
+        // Reconnect to the new server; the socket's resync reloads the map.
+        Realtime.shared.stop()
+        Realtime.shared.start()
+        router.path = []
+        await checkServer()
     }
 
     private func erase() async {

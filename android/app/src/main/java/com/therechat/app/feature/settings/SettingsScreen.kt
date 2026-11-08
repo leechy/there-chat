@@ -30,6 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.therechat.app.core.ApiClient
 import com.therechat.app.core.ServerStatus
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
@@ -56,12 +59,24 @@ fun SettingsScreen() {
     var eraseError by remember { mutableStateOf<String?>(null) }
     var server by remember { mutableStateOf<ServerStatus?>(null) }
     val api = remember { ApiClient.get(context) }
+    var serverUrl by remember { mutableStateOf(api.baseUrl) }
 
     fun checkServer() {
         server = null
         scope.launch { server = api.serverStatus() }
     }
     LaunchedEffect(Unit) { checkServer() }
+
+    /** Debug builds only: talk to another server with the same device key. */
+    fun switchServer(url: String) {
+        serverUrl = url
+        scope.launch {
+            api.use(url)
+            // Reconnect to the new server; the socket's resync reloads the map.
+            Realtime.get(context).run { stop(); start() }
+            checkServer()
+        }
+    }
 
     fun erase() {
         erasing = true
@@ -103,6 +118,21 @@ fun SettingsScreen() {
                     trailingContent = { if (erasing) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) },
                     modifier = Modifier.clickable(enabled = !erasing) { confirmErase = true },
                 )
+            }
+            if (ApiClient.servers.isNotEmpty()) {
+                item { Header("Connect to") }
+                ApiClient.servers.forEach { (name, url) ->
+                    item {
+                        ListItem(
+                            leadingContent = { RadioButton(selected = serverUrl == url, onClick = null) },
+                            headlineContent = { Text(name) },
+                            supportingContent = { Text(url.substringAfter("://")) },
+                            modifier = Modifier.selectable(selected = serverUrl == url, role = Role.RadioButton) {
+                                if (serverUrl != url) switchServer(url)
+                            },
+                        )
+                    }
+                }
             }
             item {
                 ListItem(

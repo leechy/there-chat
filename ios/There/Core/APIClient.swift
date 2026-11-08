@@ -18,12 +18,27 @@ enum ServerStatus: Sendable, Equatable {
 /// Registers the device lazily on first use, then sends the device secret as
 /// a bearer token with every request.
 actor APIClient {
-    static let shared = APIClient(
-        baseURL: URL(string: Bundle.main.object(forInfoDictionaryKey: "ThereAPIBaseURL") as? String ?? "")
-            ?? URL(string: "http://localhost:8080")!
-    )
+    /// The server this build talks to by default (Info.plist, set per configuration).
+    static let builtInURL = URL(string: Bundle.main.object(forInfoDictionaryKey: "ThereAPIBaseURL") as? String ?? "")
+        ?? URL(string: "http://localhost:8080")!
+    static let productionURL = URL(string: "https://api.there-chat.com")!
 
-    private let baseURL: URL
+    /// Servers to choose from in Settings. Only builds that don't already use
+    /// production (Debug) offer a choice, so testers can talk to real phones.
+    static let servers: [(name: String, url: URL)] =
+        builtInURL == productionURL ? [] : [("Local", builtInURL), ("Production", productionURL)]
+
+    private static let serverKey = "serverURL"
+
+    static let shared = APIClient(baseURL: {
+        if !servers.isEmpty, let saved = UserDefaults.standard.url(forKey: serverKey),
+           servers.contains(where: { $0.url == saved }) {
+            return saved
+        }
+        return builtInURL
+    }())
+
+    private(set) var baseURL: URL
     private let session: URLSession
     private var registered = false
 
@@ -48,7 +63,7 @@ actor APIClient {
 
     /// Pings /healthz without registering or authenticating, so it works
     /// even when nothing else does.
-    nonisolated func serverStatus() async -> ServerStatus {
+    func serverStatus() async -> ServerStatus {
         var request = URLRequest(url: baseURL.appending(path: "healthz"))
         request.timeoutInterval = 8
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -63,7 +78,19 @@ actor APIClient {
         }
     }
 
-    nonisolated var host: String { baseURL.host() ?? baseURL.absoluteString }
+    var host: String {
+        guard let host = baseURL.host() else { return baseURL.absoluteString }
+        return baseURL.port.map { "\(host):\($0)" } ?? host
+    }
+
+    /// Switches to another server. The same device secret registers there on
+    /// the next request; callers restart Realtime so screens reload.
+    func use(_ url: URL) {
+        guard url != baseURL else { return }
+        baseURL = url
+        registered = false
+        UserDefaults.standard.set(url, forKey: Self.serverKey)
+    }
 
     // MARK: Map and lists
 

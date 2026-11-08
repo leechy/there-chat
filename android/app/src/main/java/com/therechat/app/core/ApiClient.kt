@@ -44,8 +44,13 @@ sealed interface ServerStatus {
  */
 class ApiClient(
     private val identity: DeviceIdentity,
-    private val baseUrl: String = BuildConfig.API_BASE_URL,
+    baseUrl: String = BuildConfig.API_BASE_URL,
+    private val prefs: android.content.SharedPreferences? = null,
 ) {
+    /** Where requests go; debug builds can switch it in Settings. */
+    @Volatile var baseUrl: String = baseUrl
+        private set
+
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = false }
     private val http = HttpClient(OkHttp) {
         install(ContentNegotiation) { json(json) }
@@ -124,6 +129,19 @@ class ApiClient(
 
     /** Erases everything this device posted, then forgets its key: the next call registers a new device. */
     val host: String get() = baseUrl.substringAfter("://").substringBefore('/')
+
+    /**
+     * Switches to another server. The same device secret registers there on
+     * the next request; callers restart Realtime so screens reload.
+     */
+    suspend fun use(url: String) {
+        if (url == baseUrl) return
+        registerLock.withLock {
+            baseUrl = url
+            registered = false
+        }
+        prefs?.edit()?.putString(SERVER_KEY, url)?.apply()
+    }
 
     /** Pings /healthz without registering or authenticating, so it works even when nothing else does. */
     suspend fun serverStatus(): ServerStatus {
@@ -244,11 +262,26 @@ class ApiClient(
 
     companion object {
         @Volatile private var instance: ApiClient? = null
+        private const val SERVER_KEY = "server_url"
+        const val PRODUCTION_URL = "https://api.there-chat.com"
+
+        /**
+         * Servers to choose from in Settings. Only builds that don't already
+         * use production (debug) offer a choice, so testers can talk to real phones.
+         */
+        val servers: List<Pair<String, String>> =
+            if (BuildConfig.API_BASE_URL == PRODUCTION_URL) emptyList()
+            else listOf("Local" to BuildConfig.API_BASE_URL, "Production" to PRODUCTION_URL)
 
         /** One client per process, shared by all screens. */
         fun get(context: Context): ApiClient =
             instance ?: synchronized(this) {
-                instance ?: ApiClient(DeviceIdentity(context.applicationContext)).also { instance = it }
+                instance ?: run {
+                    val app = context.applicationContext
+                    val prefs = app.getSharedPreferences("server", Context.MODE_PRIVATE)
+                    val saved = prefs.getString(SERVER_KEY, null)?.takeIf { url -> servers.any { it.second == url } }
+                    ApiClient(DeviceIdentity(app), saved ?: BuildConfig.API_BASE_URL, prefs)
+                }.also { instance = it }
             }
     }
 }
