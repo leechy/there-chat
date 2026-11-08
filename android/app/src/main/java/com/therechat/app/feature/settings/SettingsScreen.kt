@@ -29,6 +29,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.therechat.app.core.ApiClient
+import com.therechat.app.core.ServerStatus
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import com.therechat.app.core.Realtime
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
@@ -47,6 +54,14 @@ fun SettingsScreen() {
     var confirmErase by remember { mutableStateOf(false) }
     var erasing by remember { mutableStateOf(false) }
     var eraseError by remember { mutableStateOf<String?>(null) }
+    var server by remember { mutableStateOf<ServerStatus?>(null) }
+    val api = remember { ApiClient.get(context) }
+
+    fun checkServer() {
+        server = null
+        scope.launch { server = api.serverStatus() }
+    }
+    LaunchedEffect(Unit) { checkServer() }
 
     fun erase() {
         erasing = true
@@ -89,6 +104,14 @@ fun SettingsScreen() {
                     modifier = Modifier.clickable(enabled = !erasing) { confirmErase = true },
                 )
             }
+            item {
+                ListItem(
+                    headlineContent = { Text("Server") },
+                    supportingContent = { Text("${api.host} · tap to check again") },
+                    trailingContent = { ServerStatusText(server) },
+                    modifier = Modifier.clickable(enabled = server != null) { checkServer() },
+                )
+            }
             item { ListItem(headlineContent = { Text("Version") }, trailingContent = { Text(BuildConfig.VERSION_NAME) }) }
         }
     }
@@ -125,4 +148,24 @@ private fun Header(text: String) {
 @Composable
 private fun Row(icon: ImageVector, text: String) {
     ListItem(leadingContent = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) }, headlineContent = { Text(text) })
+}
+
+@Composable
+private fun ServerStatusText(status: ServerStatus?) {
+    val (color, text) = when (status) {
+        null -> {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            return
+        }
+        is ServerStatus.Online -> Color(0xFF2E9E4F) to "Online · ${status.ms} ms"
+        is ServerStatus.Failing -> Color(0xFFE08A00) to "Error ${status.status}"
+        is ServerStatus.Unreachable -> MaterialTheme.colorScheme.error to "Unreachable"
+    }
+    androidx.compose.foundation.layout.Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        androidx.compose.foundation.layout.Box(Modifier.size(8.dp).background(color, CircleShape))
+        Text(text)
+    }
 }

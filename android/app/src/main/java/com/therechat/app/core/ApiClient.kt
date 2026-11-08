@@ -19,7 +19,10 @@ import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -28,6 +31,12 @@ import kotlinx.serialization.json.Json
 data class ApiError(val code: String, val message: String)
 
 class ApiException(val error: ApiError) : Exception(error.message)
+
+sealed interface ServerStatus {
+    data class Online(val ms: Long) : ServerStatus
+    data class Failing(val status: Int) : ServerStatus
+    data class Unreachable(val reason: String) : ServerStatus
+}
 
 /**
  * Thin client for the There REST API. Registers the device lazily on first
@@ -114,6 +123,24 @@ class ApiClient(
     suspend fun updateChat(id: String, settings: ChatSettings): Chat = call(HttpMethod.Patch, "/v1/chats/$id", enc(settings)).body()
 
     /** Erases everything this device posted, then forgets its key: the next call registers a new device. */
+    val host: String get() = baseUrl.substringAfter("://").substringBefore('/')
+
+    /** Pings /healthz without registering or authenticating, so it works even when nothing else does. */
+    suspend fun serverStatus(): ServerStatus {
+        val start = System.nanoTime()
+        return try {
+            val response = withTimeout(8_000) { http.request("$baseUrl/healthz") }
+            val ms = (System.nanoTime() - start) / 1_000_000
+            if (response.status.value == 200) ServerStatus.Online(ms) else ServerStatus.Failing(response.status.value)
+        } catch (e: TimeoutCancellationException) {
+            ServerStatus.Unreachable("timed out")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ServerStatus.Unreachable(e.message ?: "no connection")
+        }
+    }
+
     suspend fun eraseDevice() {
         call(HttpMethod.Delete, "/v1/devices/me")
         identity.reset()

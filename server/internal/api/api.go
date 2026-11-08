@@ -20,6 +20,8 @@ type Config struct {
 	MaxSpanDeg float64
 	// PingInterval is how often WebSocket clients are pinged (default 25s).
 	PingInterval time.Duration
+	// Limits caps request rates; nil means DefaultLimits.
+	Limits *Limits
 }
 
 type Server struct {
@@ -28,6 +30,7 @@ type Server struct {
 	log   *slog.Logger
 	mux   *http.ServeMux
 	hub   *hub
+	lim   limiters
 }
 
 func New(st *store.Store, cfg Config, log *slog.Logger) *Server {
@@ -37,16 +40,22 @@ func New(st *store.Store, cfg Config, log *slog.Logger) *Server {
 	if cfg.PingInterval == 0 {
 		cfg.PingInterval = defaultPingInterval
 	}
-	s := &Server{store: st, cfg: cfg, log: log, mux: http.NewServeMux(), hub: newHub()}
+	limits := DefaultLimits
+	if cfg.Limits != nil {
+		limits = *cfg.Limits
+	}
+	s := &Server{store: st, cfg: cfg, log: log, mux: http.NewServeMux(), hub: newHub(), lim: newLimiters(limits)}
 	s.routes()
 	return s
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	limitIP(s.lim.requests, s.mux.ServeHTTP)(w, r)
+}
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
-	s.mux.HandleFunc("POST /v1/devices", s.registerDevice)
+	s.mux.HandleFunc("POST /v1/devices", limitIP(s.lim.register, s.registerDevice))
 
 	s.mux.HandleFunc("DELETE /v1/devices/me", s.auth(s.eraseDevice))
 	s.mux.HandleFunc("PUT /v1/devices/me/push", s.auth(s.setPush))
@@ -54,12 +63,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/names/suggest", s.auth(s.suggestNames))
 	s.mux.HandleFunc("GET /v1/map/chats", s.auth(s.mapChats))
 	s.mux.HandleFunc("GET /v1/me/chats", s.auth(s.myChats))
-	s.mux.HandleFunc("POST /v1/chats", s.auth(s.createChat))
+	s.mux.HandleFunc("POST /v1/chats", s.auth(limitDevice(s.lim.createChat, s.createChat)))
 	s.mux.HandleFunc("GET /v1/chats/{id}", s.auth(s.getChat))
 	s.mux.HandleFunc("GET /v1/invites/{code}", s.auth(s.getInvite))
-	s.mux.HandleFunc("POST /v1/chats/{id}/join", s.auth(s.joinChat))
+	s.mux.HandleFunc("POST /v1/chats/{id}/join", s.auth(limitDevice(s.lim.join, s.joinChat)))
 	s.mux.HandleFunc("GET /v1/chats/{id}/messages", s.auth(s.listMessages))
-	s.mux.HandleFunc("POST /v1/chats/{id}/messages", s.auth(s.postMessage))
+	s.mux.HandleFunc("POST /v1/chats/{id}/messages", s.auth(limitDevice(s.lim.message, s.postMessage)))
 	s.mux.HandleFunc("GET /v1/ws", s.auth(s.websocket))
 	s.chatRoutes()
 }

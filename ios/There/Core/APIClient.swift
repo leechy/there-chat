@@ -7,6 +7,12 @@ struct APIError: Error, Decodable, Sendable, LocalizedError {
     var errorDescription: String? { message }
 }
 
+enum ServerStatus: Sendable, Equatable {
+    case online(ms: Int)
+    case failing(status: Int)
+    case unreachable(String)
+}
+
 /// Thin async client for the There REST API.
 ///
 /// Registers the device lazily on first use, then sends the device secret as
@@ -37,6 +43,27 @@ actor APIClient {
         self.baseURL = baseURL
         self.session = session
     }
+
+    // MARK: Server status
+
+    /// Pings /healthz without registering or authenticating, so it works
+    /// even when nothing else does.
+    nonisolated func serverStatus() async -> ServerStatus {
+        var request = URLRequest(url: baseURL.appending(path: "healthz"))
+        request.timeoutInterval = 8
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        let start = ContinuousClock.now
+        do {
+            let (_, response) = try await session.data(for: request)
+            let ms = Int((ContinuousClock.now - start) / .milliseconds(1))
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            return status == 200 ? .online(ms: ms) : .failing(status: status)
+        } catch {
+            return .unreachable(error.localizedDescription)
+        }
+    }
+
+    nonisolated var host: String { baseURL.host() ?? baseURL.absoluteString }
 
     // MARK: Map and lists
 

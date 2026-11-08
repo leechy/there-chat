@@ -34,12 +34,10 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "There uses your location to show the chats around you. Your location is never stored."
         INFOPLIST_KEY_CFBundleDisplayName: There
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
     info:
       path: There/Info.plist
       properties:
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        ITSAppUsesNonExemptEncryption: false
         ThereAPIBaseURL: $(THERE_API_BASE_URL)
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

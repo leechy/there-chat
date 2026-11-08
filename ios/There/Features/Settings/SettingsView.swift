@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var confirmErase = false
     @State private var erasing = false
     @State private var eraseError: String?
+    @State private var server: ServerStatus?
 
     var body: some View {
         NavigationStack {
@@ -39,11 +40,20 @@ struct SettingsView: View {
                     Text("Deletes your messages, reactions and names in every chat, removes you from your chats and deletes the chats you created. This can't be undone.")
                 }
                 Section {
+                    Button { Task { await checkServer() } } label: {
+                        LabeledContent("Server") { ServerStatusText(status: server) }
+                    }
+                    .foregroundStyle(Color.primary)
+                } footer: {
+                    Text("\(APIClient.shared.host) · tap to check again")
+                }
+                Section {
                     LabeledContent("Version",
                                    value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                 }
             }
             .labelStyle(SettingsLabelStyle())
+            .task { await checkServer() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog("Erase all your data?", isPresented: $confirmErase, titleVisibility: .visible) {
@@ -68,6 +78,11 @@ struct SettingsView: View {
 }
 
 extension SettingsView {
+    private func checkServer() async {
+        server = nil
+        server = await APIClient.shared.serverStatus()
+    }
+
     private func erase() async {
         erasing = true
         defer { erasing = false }
@@ -82,6 +97,30 @@ extension SettingsView {
         Realtime.shared.start()
         router.path = []
         dismiss()
+    }
+}
+
+private struct ServerStatusText: View {
+    let status: ServerStatus?
+
+    var body: some View {
+        switch status {
+        case nil:
+            ProgressView()
+        case .online(let ms):
+            dot(.green, "Online · \(ms) ms")
+        case .failing(let code):
+            dot(.orange, "Error \(code)")
+        case .unreachable:
+            dot(.red, "Unreachable")
+        }
+    }
+
+    private func dot(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(text)
+        }
     }
 }
 

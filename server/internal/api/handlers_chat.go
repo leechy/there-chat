@@ -20,7 +20,7 @@ func (s *Server) chatRoutes() {
 	s.mux.HandleFunc("POST /v1/messages/{id}/{action}", s.auth(s.moderateMessage))
 	s.mux.HandleFunc("PUT /v1/messages/{id}/reactions/{emoji}", s.auth(s.react(true)))
 	s.mux.HandleFunc("DELETE /v1/messages/{id}/reactions/{emoji}", s.auth(s.react(false)))
-	s.mux.HandleFunc("POST /v1/reports", s.auth(s.report))
+	s.mux.HandleFunc("POST /v1/reports", s.auth(limitDevice(s.lim.report, s.report)))
 }
 
 // --- chat settings ---
