@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -68,7 +69,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -313,9 +316,25 @@ private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, 
     val items = remember(state.messages, state.outbox) { timeline(state.messages + state.outbox).asReversed() }
     val list = rememberLazyListState()
 
-    // Show new messages if the reader was already at the bottom.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var unseen by remember { mutableIntStateOf(0) }
+    var lastTop by remember { mutableStateOf<String?>(null) }
+
+    // Show new messages if the reader was at the bottom or sent one;
+    // otherwise count them for the "new messages" button.
     LaunchedEffect(items.firstOrNull()?.key) {
-        if (list.firstVisibleItemIndex <= 1) list.animateScrollToItem(0)
+        val top = items.firstOrNull() ?: return@LaunchedEffect
+        val previous = lastTop
+        lastTop = top.key
+        val mineJustSent = top is Item.Msg && top.message.isLocal
+        if (previous == null || mineJustSent || list.firstVisibleItemIndex <= 1) {
+            list.animateScrollToItem(0)
+        } else {
+            unseen += items.takeWhile { it.key != previous }.count { it is Item.Msg }
+        }
+    }
+    LaunchedEffect(list) {
+        snapshotFlow { list.firstVisibleItemIndex == 0 }.collect { if (it) unseen = 0 }
     }
 
     if (items.isEmpty()) {
@@ -324,9 +343,10 @@ private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, 
         }
         return
     }
+    Box(modifier.fillMaxSize()) {
     LazyColumn(
         state = list,
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         reverseLayout = true,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -355,6 +375,22 @@ private fun Messages(state: ChatUiState, vm: ChatViewModel, modifier: Modifier, 
                 LaunchedEffect(state.offline) { vm.loadOlder() } // retries when back online
             }
         }
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = unseen > 0,
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
+        enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it },
+        exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it },
+    ) {
+        androidx.compose.material3.ExtendedFloatingActionButton(
+            text = { Text(if (unseen == 1) "1 new message" else "$unseen new messages") },
+            icon = { Icon(Icons.Outlined.ArrowDownward, contentDescription = null) },
+            onClick = {
+                unseen = 0
+                scope.launch { list.animateScrollToItem(0) }
+            },
+        )
+    }
     }
 }
 

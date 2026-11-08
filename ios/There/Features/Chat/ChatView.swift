@@ -5,6 +5,8 @@ struct ChatView: View {
     @State private var model: ChatModel
     @State private var draft = ""
     @State private var position = ScrollPosition(edge: .bottom)
+    @State private var atBottom = true
+    @State private var unseen = 0
     @State private var nameSheet: NameSheet.Purpose?
     @State private var reportTarget: ReportTarget?
     @State private var confirmLeave = false
@@ -101,7 +103,37 @@ struct ChatView: View {
             .scrollPosition($position)
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: model.lastSeq) { _, _ in withAnimation { position.scrollTo(edge: .bottom) } }
+            // Only scrolling (not new content) decides whether the reader is
+            // at the bottom, so a new message doesn't count as scrolled up.
+            .onScrollGeometryChange(for: ScrollGeometry.self, of: { $0 }) { old, new in
+                guard old.contentOffset != new.contentOffset || old.containerSize != new.containerSize else { return }
+                atBottom = new.visibleRect.maxY >= new.contentSize.height - 80
+                if atBottom { unseen = 0 }
+            }
+            .onChange(of: model.lastSeq) { old, _ in
+                if atBottom || old == 0 {
+                    withAnimation { position.scrollTo(edge: .bottom) }
+                } else {
+                    unseen += model.messages.reversed().prefix { $0.seq > old }.count
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if unseen > 0 {
+                    Button {
+                        withAnimation { position.scrollTo(edge: .bottom) }
+                        unseen = 0
+                    } label: {
+                        Label(unseen == 1 ? "1 new message" : "\(unseen) new messages", systemImage: "arrow.down")
+                            .font(.subheadline.weight(.medium))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.glass)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.default, value: unseen > 0)
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
                 // Keep the latest message visible above the keyboard.
                 withAnimation { position.scrollTo(edge: .bottom) }
