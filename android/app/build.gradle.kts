@@ -8,6 +8,13 @@ plugins {
     alias(libs.plugins.maps.secrets)
 }
 
+// Firebase (push only) is configured by app/google-services.json from the
+// Firebase console, kept outside git. Without it the app builds and runs,
+// just without notifications.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Upload key for Google Play, kept outside git (see docs/DEPLOY.md).
 val keystoreProps = Properties().apply {
     rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
@@ -94,6 +101,9 @@ dependencies {
 
     implementation(libs.emoji.picker)
     implementation(libs.zxing.core)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
 }

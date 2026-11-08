@@ -90,6 +90,7 @@ struct NewChatView: View {
                     name: form.trimmedName))
                 dismiss()
                 router.open(.chat(chat))
+                await Push.shared.requestIfNeeded()
             } catch {
                 self.error = error.localizedDescription
             }

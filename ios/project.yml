@@ -35,6 +35,10 @@ targets:
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "There uses your location to show the chats around you. Your location is never stored."
         INFOPLIST_KEY_CFBundleDisplayName: There
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+    entitlements:
+      path: There/There.entitlements
+      properties:
+        aps-environment: development # Xcode switches it to production for App Store builds
     info:
       path: There/Info.plist
       properties:

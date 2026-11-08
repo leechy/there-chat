@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var server: ServerStatus?
     @State private var host = ""
     @State private var serverURL: URL?
+    @Bindable private var push = Push.shared
 
     var body: some View {
         NavigationStack {
@@ -20,6 +21,25 @@ struct SettingsView: View {
                           systemImage: "theatermasks")
                     Label("Your location is only used to show the map around you and is never stored.",
                           systemImage: "location")
+                }
+                Section {
+                    LabeledContent("Notifications") {
+                        switch push.status {
+                        case .authorized, .provisional, .ephemeral: Text("On")
+                        case .denied:
+                            Button("Off · Open Settings") {
+                                if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
+                            }
+                        default: Text("Asked when you join a chat")
+                        }
+                    }
+                    Toggle("Show Message Text", isOn: $push.preview)
+                } header: {
+                    Text("Notifications")
+                } footer: {
+                    Text("Notifications show the chat and the author's name, and the message text if you allow it. They are delivered through Apple's servers. Turn them off for a single chat in its Chat Info.")
                 }
                 Section("This Device") {
                     Label("Your chats are tied to a secret key stored on this iPhone. It survives reinstalling the app, but not moving to another phone.",
@@ -67,6 +87,7 @@ struct SettingsView: View {
             }
             .labelStyle(SettingsLabelStyle())
             .task { await checkServer() }
+            .task { await push.refreshStatus() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog("Erase all your data?", isPresented: $confirmErase, titleVisibility: .visible) {
@@ -101,6 +122,7 @@ extension SettingsView {
     /// Debug builds only: talk to another server with the same device key.
     private func switchServer(to url: URL) async {
         await APIClient.shared.use(url)
+        await Push.shared.upload()
         // Reconnect to the new server; the socket's resync reloads the map.
         Realtime.shared.stop()
         Realtime.shared.start()
@@ -120,6 +142,7 @@ extension SettingsView {
         // Reconnect as the new device; the socket's resync reloads the map.
         Realtime.shared.stop()
         Realtime.shared.start()
+        await Push.shared.upload() // the new anonymous device gets the token
         router.path = []
         dismiss()
     }

@@ -58,6 +58,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.therechat.app.LocalNavigator
 import com.therechat.app.Screen
 import com.therechat.app.core.ApiClient
+import com.therechat.app.core.Push
 import com.therechat.app.core.ChatKind
 import com.therechat.app.feature.map.TriangleShape
 import com.therechat.app.ui.components.EmojiPickerSheet
@@ -68,7 +69,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun NewChatScreen(start: LatLng = LatLng(48.8530, 2.3499)) {
     val nav = LocalNavigator.current
-    val api = ApiClient.get(LocalContext.current)
+    val context = LocalContext.current
+    val api = ApiClient.get(context)
     val scope = rememberCoroutineScope()
     val camera = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(start, 17f) }
     val density = LocalDensity.current
@@ -102,6 +104,7 @@ fun NewChatScreen(start: LatLng = LatLng(48.8530, 2.3499)) {
                     freeJoin = freeJoin, premoderated = premoderated && kind == ChatKind.CHAT, visible = visible, name = name.trim(),
                 ))
                 nav.replaceTop(Screen.ChatScreen(chat))
+                Push.requestIfNeeded(context)
             } catch (e: Exception) {
                 error = e.message
             } finally {

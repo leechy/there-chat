@@ -158,6 +158,11 @@ actor APIClient {
         registered = false
     }
 
+    func setPush(platform: String, token: String, preview: Bool) async throws {
+        struct Body: Encodable { let platform: String; let token: String; let preview: Bool }
+        try await sendEmpty("PUT", "/v1/devices/me/push", body: Body(platform: platform, token: token, preview: preview))
+    }
+
     func deleteChat(_ id: String) async throws {
         try await sendEmpty("DELETE", "/v1/chats/\(id)")
     }

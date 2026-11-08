@@ -38,15 +38,71 @@ func (s *Store) DeviceBySecret(ctx context.Context, secret []byte) (string, erro
 	return id, err
 }
 
-// SetPushToken stores the push token, or clears it when platform is empty.
-func (s *Store) SetPushToken(ctx context.Context, deviceID, platform, token string) error {
-	var p, t any
-	if platform != "" {
-		p, t = platform, token
-	}
+// SetPushToken stores the device's push token and whether notifications
+// show message text. A token belongs to one device only: an app that was
+// erased and registered again takes its token along.
+func (s *Store) SetPushToken(ctx context.Context, deviceID, platform, token string, preview bool) error {
+	return s.tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE devices SET push_platform = NULL, push_token = NULL WHERE push_token = ? AND id <> ?`,
+			token, deviceID); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx,
+			`UPDATE devices SET push_platform = ?, push_token = ?, push_preview = ? WHERE id = ?`,
+			platform, token, boolInt(preview), deviceID)
+		return err
+	})
+}
+
+// ClearPushToken forgets a device's push token.
+func (s *Store) ClearPushToken(ctx context.Context, deviceID string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE devices SET push_platform = ?, push_token = ? WHERE id = ?`, p, t, deviceID)
+		`UPDATE devices SET push_platform = NULL, push_token = NULL WHERE id = ?`, deviceID)
 	return err
+}
+
+// DropPushToken forgets a token that Apple or Google reported as no longer valid.
+func (s *Store) DropPushToken(ctx context.Context, token string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE devices SET push_platform = NULL, push_token = NULL WHERE push_token = ?`, token)
+	return err
+}
+
+// PushTarget is a device to notify about a new message.
+type PushTarget struct {
+	Platform, Token string
+	Preview         bool
+	Badge           int64 // unread messages in all its chats with notifications on
+}
+
+// PushTargets lists the devices to notify about a new message in a chat:
+// active members with notifications on and a push token, except the author.
+func (s *Store) PushTargets(ctx context.Context, chatID, authorMemberID string) ([]PushTarget, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT d.push_platform, d.push_token, d.push_preview,
+		       (SELECT COUNT(*) FROM members mm
+		          JOIN chats cc ON cc.id = mm.chat_id AND cc.deleted_at IS NULL
+		          JOIN messages g ON g.chat_id = mm.chat_id
+		         WHERE mm.device_id = d.id AND mm.status = 'active' AND mm.notify = 1
+		           AND g.seq > mm.last_read_seq AND g.status = 'published' AND g.kind = 'text'
+		           AND (g.member_id IS NULL OR g.member_id <> mm.id)) AS badge
+		FROM members m JOIN devices d ON d.id = m.device_id
+		WHERE m.chat_id = ? AND m.status = 'active' AND m.notify = 1 AND m.id <> ?
+		  AND d.push_token IS NOT NULL`, chatID, authorMemberID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PushTarget
+	for rows.Next() {
+		var t PushTarget
+		if err := rows.Scan(&t.Platform, &t.Token, &t.Preview, &t.Badge); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }
 
 // Erased tells callers which chats an erased device touched, for realtime events.

@@ -55,6 +55,7 @@ final class MapModel {
         guard let mine = try? await api.myChats() else { return }
         myChatCount = mine.count
         unread = Int(mine.filter { $0.chat.me?.notify != false }.map(\.unread).reduce(0, +))
+        Push.shared.setBadge(unread)
     }
 
     /// Keeps the My Chats counters (and the map, when chats change) current

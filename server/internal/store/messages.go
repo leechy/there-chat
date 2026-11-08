@@ -20,6 +20,9 @@ type Message struct {
 	CreatedAt  int64      `json:"created_at"`
 	DeletedAt  *int64     `json:"deleted_at,omitempty"`
 	Reactions  []Reaction `json:"reactions,omitempty"`
+	// Replayed is set when PostMessage returned an earlier message for a
+	// repeated client ID, so nothing new happened.
+	Replayed bool `json:"-"`
 }
 
 type Reaction struct {
@@ -84,6 +87,7 @@ func (s *Store) PostMessage(ctx context.Context, chat Chat, author Member, body,
 				`SELECT `+messageColumns+messageFrom+`WHERE msg.member_id = ? AND msg.client_id = ?`,
 				author.ID, clientID), &m)
 			if err == nil {
+				m.Replayed = true
 				return nil
 			}
 			if !errors.Is(err, sql.ErrNoRows) {

@@ -30,6 +30,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.therechat.app.core.ApiClient
 import com.therechat.app.core.ServerStatus
+import com.therechat.app.core.Push
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Switch
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.RadioButton
 import androidx.compose.ui.semantics.Role
@@ -60,6 +65,8 @@ fun SettingsScreen() {
     var server by remember { mutableStateOf<ServerStatus?>(null) }
     val api = remember { ApiClient.get(context) }
     var serverUrl by remember { mutableStateOf(api.baseUrl) }
+    var preview by remember { mutableStateOf(Push.preview(context)) }
+    val notificationsOn = remember { Push.enabled(context) }
 
     fun checkServer() {
         server = null
@@ -74,6 +81,7 @@ fun SettingsScreen() {
             api.use(url)
             // Reconnect to the new server; the socket's resync reloads the map.
             Realtime.get(context).run { stop(); start() }
+            Push.sync(context) // the new server gets the token
             checkServer()
         }
     }
@@ -85,6 +93,7 @@ fun SettingsScreen() {
                 ApiClient.get(context).eraseDevice()
                 // Reconnect as the new device; the socket's resync reloads the map.
                 Realtime.get(context).run { stop(); start() }
+                Push.sync(context) // the new anonymous device gets the token
                 nav.home()
             } catch (e: Exception) {
                 eraseError = e.message ?: "Something went wrong"
@@ -107,6 +116,32 @@ fun SettingsScreen() {
             item { Row(Icons.Outlined.NoAccounts, "No account, no phone number, no e-mail.") }
             item { Row(Icons.Outlined.TheaterComedy, "Your name is chosen separately in every chat. Nobody can tell that two names are the same person.") }
             item { Row(Icons.Outlined.LocationOn, "Your location is only used to show the map around you and is never stored.") }
+            item { Header("Notifications") }
+            item {
+                ListItem(
+                    headlineContent = { Text("Notifications") },
+                    supportingContent = {
+                        Text(if (notificationsOn) "On. Turn them off for a single chat in its Chat Info." else "Off. Tap to open system settings.")
+                    },
+                    modifier = Modifier.clickable {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                        )
+                    },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Show message text") },
+                    supportingContent = { Text("Notifications show the chat and the author's name, and the text if this is on. They are delivered through Google's servers.") },
+                    trailingContent = { Switch(checked = preview, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(value = preview, role = Role.Switch) {
+                        preview = it
+                        Push.setPreview(context, it)
+                    },
+                )
+            }
             item { Header("This device") }
             item { Row(Icons.Outlined.Key, "Your chats are tied to a secret key on this phone. It is backed up with your Google account, so it survives reinstalling and moving to a new phone.") }
             item {

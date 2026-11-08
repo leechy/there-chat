@@ -102,12 +102,28 @@ Firebase Dynamic Links закрыты (август 2025), поэтому всё
 
 ## 3. Push-уведомления
 
-- **Android**: FCM HTTP v1. Нужен Firebase-проект, приложение `com.therechat.app`,
-  `google-services.json` в приложении и ключ сервисного аккаунта на сервере.
-- **iOS**: напрямую в APNs из Go по токену (ключ `.p8`), без Firebase SDK в приложении:
-  меньше зависимостей и честнее для анонимного приложения.
-- Сервер: очередь отправки, учёт `notify` по каждому участию, удаление невалидных токенов.
-  Код ещё не написан.
+Как устроено — в [ARCHITECTURE.md](ARCHITECTURE.md#push). Каждая платформа выключена, пока для
+неё нет настроек; в журнале при старте строка `push platforms=[...]`.
+
+**iOS (APNs)** — ключ `.p8` уже лежит в `/etc/there/apns.p8`. В `/etc/there/there.env`:
+
+```
+THERE_APNS_KEY_FILE=/etc/there/apns.p8
+THERE_APNS_KEY_ID=FM58Z964XL
+THERE_APNS_TEAM_ID=UWJ374YJ4M
+THERE_APNS_TOPIC=com.there-chat.app
+```
+
+**Android (FCM)**:
+1. https://console.firebase.google.com → Add project (Google Analytics не нужен) → Android app
+   `com.therechat.app`.
+2. Скачать `google-services.json` в `android/app/` (в git не попадает). Без него приложение
+   собирается и работает, только без уведомлений.
+3. Project settings → Service accounts → Generate new private key. Файл положить на сервер
+   в `/etc/there/fcm.json` (`chown root:there`, `chmod 640`), в `there.env`:
+   `THERE_FCM_CREDENTIALS=/etc/there/fcm.json`.
+
+После правки `there.env`: `systemctl restart there`.
 
 ## Сборка Android для Google Play
 
@@ -144,7 +160,7 @@ Firebase Dynamic Links закрыты (август 2025), поэтому всё
 - [ ] Rate limiting: регистрация устройств, отправка сообщений, создание чатов, вступления.
 - [ ] Реальный IP из `X-Forwarded-For` только от Caddy.
 - [ ] `.well-known` и страница приглашения `there-chat.com/<код>`.
-- [ ] Push (см. выше).
+- [x] Push: код готов (раздел 3), осталось включить на сервере и создать Firebase-проект.
 - [ ] Личная блокировка («скрыть этого человека») в дополнение к блокировке админом чата —
       требование App Store 1.2 для приложений с пользовательским контентом.
 - [ ] Политика конфиденциальности и условия использования (с нулевой терпимостью к нарушителям)

@@ -25,8 +25,15 @@ struct ChatView: View {
             .animation(.default, value: model.isOffline)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
-            .task { model.start() }
-            .onDisappear { model.stop() }
+            .task {
+                model.start()
+                Push.shared.openChatID = chat.id
+                Push.shared.clearDelivered(chatID: chat.id)
+            }
+            .onDisappear {
+                model.stop()
+                if Push.shared.openChatID == chat.id { Push.shared.openChatID = nil }
+            }
             .sheet(item: $nameSheet) { purpose in
                 NameSheet(purpose: purpose, chat: chat) { name in
                     switch purpose {

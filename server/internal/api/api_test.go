@@ -22,13 +22,17 @@ type client struct {
 }
 
 func newServer(t *testing.T) *httptest.Server {
+	return newServerWith(t, Config{})
+}
+
+func newServerWith(t *testing.T, cfg Config) *httptest.Server {
 	t.Helper()
 	st, err := store.Open(context.Background(), ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	srv := httptest.NewServer(New(st, Config{}, slog.New(slog.NewTextHandler(io.Discard, nil))))
+	srv := httptest.NewServer(New(st, cfg, slog.New(slog.NewTextHandler(io.Discard, nil))))
 	t.Cleanup(srv.Close)
 	return srv
 }

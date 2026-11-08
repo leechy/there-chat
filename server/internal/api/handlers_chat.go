@@ -344,6 +344,7 @@ func (s *Server) moderateMessage(w http.ResponseWriter, r *http.Request) {
 		result = "approved"
 	}
 	s.publish(r.Context(), Event{Type: EvModerated, ChatID: a.chat.ID, Seq: msg.Seq, MessageID: msg.ID, Action: result}, "")
+	s.notifyMessage(a.chat, msg)
 	writeJSON(w, http.StatusOK, msg)
 }
 

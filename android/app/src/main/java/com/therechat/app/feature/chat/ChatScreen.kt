@@ -91,6 +91,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.therechat.app.LocalNavigator
 import com.therechat.app.Screen
 import com.therechat.app.core.Chat
+import com.therechat.app.core.Push
 import com.therechat.app.core.ChatKind
 import com.therechat.app.core.Member
 import com.therechat.app.core.Message
@@ -123,7 +124,12 @@ fun ChatScreen(chat: Chat, invite: String?) {
 
     DisposableEffect(chat.id) {
         vm.start()
-        onDispose { vm.stop() }
+        Push.openChatId = chat.id
+        Push.clear(context, chat.id)
+        onDispose {
+            vm.stop()
+            if (Push.openChatId == chat.id) Push.openChatId = null
+        }
     }
 
     val c = state.chat

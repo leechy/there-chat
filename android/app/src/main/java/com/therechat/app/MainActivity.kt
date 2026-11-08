@@ -1,6 +1,9 @@
 package com.therechat.app
 
+import android.Manifest
 import android.content.Intent
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,6 +24,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.therechat.app.core.ApiClient
+import com.therechat.app.core.Push
 import com.therechat.app.core.Realtime
 import com.therechat.app.feature.chat.ChatScreen
 import com.therechat.app.feature.chatinfo.ChatInfoScreen
@@ -34,9 +38,18 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val navigator = Navigator()
 
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) Push.sync(this)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Push.requestPermission = {
+            if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        Push.sync(this) // tokens can change; send the current one on every launch
         if (savedInstanceState == null) handleLink(intent)
         setContent {
             ThereTheme {
@@ -76,12 +89,19 @@ class MainActivity : ComponentActivity() {
     // The realtime socket lives only while the app is in the foreground.
     override fun onStart() {
         super.onStart()
+        Push.foreground = true
         Realtime.get(this).start()
     }
 
     override fun onStop() {
         super.onStop()
+        Push.foreground = false
         Realtime.get(this).stop()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Push.requestPermission = null // the next activity sets its own in onCreate
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -89,8 +109,21 @@ class MainActivity : ComponentActivity() {
         handleLink(intent)
     }
 
-    /** Opens https://there-chat.com/<code> and there://<code> invite links. */
+    /**
+     * Opens a chat from a tapped notification, or an invite link:
+     * https://there-chat.com/<code> and there://<code>.
+     */
     private fun handleLink(intent: Intent?) {
+        intent?.getStringExtra(Push.EXTRA_CHAT_ID)?.let { chatId ->
+            intent.removeExtra(Push.EXTRA_CHAT_ID)
+            lifecycleScope.launch {
+                runCatching { ApiClient.get(this@MainActivity).chat(chatId) }.onSuccess { chat ->
+                    navigator.home()
+                    navigator.open(Screen.ChatScreen(chat))
+                }
+            }
+            return
+        }
         val uri = intent?.data ?: return
         val code = (if (uri.scheme == "there") uri.host else uri.lastPathSegment)?.takeIf { it.isNotBlank() } ?: return
         lifecycleScope.launch {

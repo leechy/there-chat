@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.therechat.app.core.ApiClient
+import com.therechat.app.core.Push
 import com.therechat.app.core.ApiException
 import com.therechat.app.core.Chat
 import com.therechat.app.core.ChatKind
@@ -210,6 +211,7 @@ class ChatViewModel(app: Application, chat: Chat, private val invite: String?) :
         val chat = api.join(chatId, name, invite)
         _state.update { it.copy(chat = chat) }
         loadLatest()
+        Push.requestIfNeeded(getApplication())
     }
 
     suspend fun rename(name: String) {

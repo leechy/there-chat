@@ -22,6 +22,8 @@ type Config struct {
 	PingInterval time.Duration
 	// Limits caps request rates; nil means DefaultLimits.
 	Limits *Limits
+	// Push delivers notifications; nil turns them off (tokens are still stored).
+	Push Pusher
 }
 
 type Server struct {
@@ -31,6 +33,7 @@ type Server struct {
 	mux   *http.ServeMux
 	hub   *hub
 	lim   limiters
+	push  Pusher
 }
 
 func New(st *store.Store, cfg Config, log *slog.Logger) *Server {
@@ -44,7 +47,7 @@ func New(st *store.Store, cfg Config, log *slog.Logger) *Server {
 	if cfg.Limits != nil {
 		limits = *cfg.Limits
 	}
-	s := &Server{store: st, cfg: cfg, log: log, mux: http.NewServeMux(), hub: newHub(), lim: newLimiters(limits)}
+	s := &Server{store: st, cfg: cfg, log: log, mux: http.NewServeMux(), hub: newHub(), lim: newLimiters(limits), push: cfg.Push}
 	s.routes()
 	return s
 }

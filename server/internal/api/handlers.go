@@ -46,33 +46,6 @@ func (s *Server) registerDevice(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) setPush(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Platform string `json:"platform"`
-		Token    string `json:"token"`
-	}
-	if !readJSON(w, r, &req) {
-		return
-	}
-	if (req.Platform != "apns" && req.Platform != "fcm") || req.Token == "" || len(req.Token) > 4096 {
-		writeError(w, http.StatusBadRequest, "bad_push", "platform must be apns or fcm, token required")
-		return
-	}
-	if err := s.store.SetPushToken(r.Context(), deviceID(r), req.Platform, req.Token); err != nil {
-		s.internal(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Server) clearPush(w http.ResponseWriter, r *http.Request) {
-	if err := s.store.SetPushToken(r.Context(), deviceID(r), "", ""); err != nil {
-		s.internal(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
 // eraseDevice deletes everything this device posted and retires its key.
 // The client then forgets the key and starts over as a new device.
 func (s *Server) eraseDevice(w http.ResponseWriter, r *http.Request) {
@@ -363,6 +336,7 @@ func (s *Server) postMessage(w http.ResponseWriter, r *http.Request) {
 		privateTo = msg.MemberID // premoderated: only the author and admins know yet
 	}
 	s.publish(r.Context(), Event{Type: EvMessage, ChatID: a.chat.ID, Seq: msg.Seq, MessageID: msg.ID}, privateTo)
+	s.notifyMessage(a.chat, msg)
 	writeJSON(w, http.StatusCreated, msg)
 }
 

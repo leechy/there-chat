@@ -15,6 +15,7 @@ android/build/
 android/app/build/
 android/local.properties
 android/secrets.properties
+android/app/google-services.json
 android/.idea/
 android/.kotlin/
 *.iml

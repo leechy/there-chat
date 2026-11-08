@@ -15,6 +15,8 @@ secretsPlugin = "2.0.1"
 junit = "4.13.2"
 emojiPicker = "1.5.0"
 zxing = "3.5.3"
+firebaseBom = "34.4.0"
+googleServices = "4.4.3"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -37,10 +39,13 @@ ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", 
 junit = { module = "junit:junit", version.ref = "junit" }
 emoji-picker = { module = "androidx.emoji2:emoji2-emojipicker", version.ref = "emojiPicker" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 maps-secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secretsPlugin" }

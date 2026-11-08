@@ -165,6 +165,12 @@ class ApiClient(
         registerLock.withLock { registered = false }
     }
 
+    @Serializable private data class PushBody(val platform: String, val token: String, val preview: Boolean)
+
+    suspend fun setPush(platform: String, token: String, preview: Boolean) {
+        call(HttpMethod.Put, "/v1/devices/me/push", enc(PushBody(platform, token, preview)))
+    }
+
     suspend fun deleteChat(id: String) { call(HttpMethod.Delete, "/v1/chats/$id") }
 
     suspend fun join(id: String, name: String, invite: String?): Chat =

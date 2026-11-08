@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct ThereApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var router = Router()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -25,6 +26,7 @@ struct ThereApp: App {
             .environment(router)
             .tint(Color.accentColor)
             .onOpenURL { router.handle($0) }
+            .task { Push.shared.setUp(router: router) }
             .onChange(of: scenePhase, initial: true) { _, phase in
                 // The realtime socket lives only while the app is in the foreground.
                 switch phase {

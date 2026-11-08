@@ -204,6 +204,7 @@ final class ChatModel {
     func join(as name: String) async throws {
         chat = try await api.join(chat.id, name: name, invite: invite)
         await loadLatest()
+        await Push.shared.requestIfNeeded()
     }
 
     func leave() async throws {
