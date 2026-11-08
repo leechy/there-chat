@@ -1,0 +1,29 @@
+# Uploads the static site (web/) when it changes on main.
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths: [web/**, .github/workflows/deploy-web.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH key
+        run: |
+          install -d -m 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ vars.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - run: make web HOST="deploy@${{ vars.DEPLOY_IP }}"

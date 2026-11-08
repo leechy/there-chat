@@ -7,10 +7,14 @@
 #   make web         upload the static site (web/)
 #   make logs        follow server logs
 #
+# Pushes to main deploy automatically: .github/workflows/deploy-*.yml
+#
 # Before DNS works, pass the IP: make deploy HOST=root@<droplet-ip>
 
 HOST ?= root@api.there-chat.com
 GO   ?= go
+# The deploy user (GitHub Actions) restarts the service through sudo; root doesn't need it.
+SUDO ?=
 BIN  := build/there-linux-amd64
 
 .PHONY: test build provision deploy web logs status
@@ -24,12 +28,12 @@ build:
 
 provision:
 	ssh $(HOST) 'mkdir -p /tmp/there-deploy'
-	scp deploy/setup.sh deploy/there.service deploy/Caddyfile $(HOST):/tmp/there-deploy/
+	scp deploy/setup.sh deploy/there.service deploy/Caddyfile deploy/github-actions.pub $(HOST):/tmp/there-deploy/
 	ssh $(HOST) 'bash /tmp/there-deploy/setup.sh'
 
 deploy: test build
 	scp $(BIN) $(HOST):/opt/there/there.new
-	ssh $(HOST) 'chmod 755 /opt/there/there.new && mv /opt/there/there.new /opt/there/there && systemctl restart there && sleep 1 && systemctl is-active there && curl -fsS 127.0.0.1:8080/healthz'
+	ssh $(HOST) 'chmod 755 /opt/there/there.new && mv /opt/there/there.new /opt/there/there && $(SUDO) systemctl restart there && sleep 1 && systemctl is-active there && curl -fsS 127.0.0.1:8080/healthz'
 
 web:
 	rsync -az --delete web/ $(HOST):/var/www/there/

@@ -55,6 +55,23 @@ install -d -o root -g root -m 755 /opt/there /var/www/there
 install -d -o there -g there -m 750 /var/lib/there
 install -d -o root -g there -m 750 /etc/there
 
+echo "== deploy user for GitHub Actions"
+# Can replace the binary and the site and restart the service, nothing else.
+# Its only key is the public half in deploy/github-actions.pub.
+id deploy >/dev/null 2>&1 || useradd --create-home --shell /bin/bash deploy
+chown deploy:deploy /opt/there /var/www/there
+chown -R deploy:deploy /var/www/there
+[ -f /opt/there/there ] && chown deploy:deploy /opt/there/there
+install -d -o deploy -g deploy -m 700 /home/deploy/.ssh
+if [ -f "$SRC/github-actions.pub" ]; then
+  echo "restrict $(cat "$SRC/github-actions.pub")" > /home/deploy/.ssh/authorized_keys
+  chown deploy:deploy /home/deploy/.ssh/authorized_keys
+  chmod 600 /home/deploy/.ssh/authorized_keys
+fi
+echo 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart there' > /etc/sudoers.d/there-deploy
+chmod 440 /etc/sudoers.d/there-deploy
+visudo -cqf /etc/sudoers.d/there-deploy
+
 echo "== config files"
 install -m 644 "$SRC/there.service" /etc/systemd/system/there.service
 install -m 644 "$SRC/Caddyfile" /etc/caddy/Caddyfile

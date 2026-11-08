@@ -60,8 +60,26 @@
 - Мониторинг: внешний пинг `https://api.there-chat.com/healthz` (UptimeRobot или DO Uptime).
 
 **Деплой**
-- Сначала `make deploy`: тесты → сборка → `scp` → `systemctl restart there`.
-- Позже GitHub Actions, когда появится удалённый репозиторий.
+- Автоматически при пуше в `main`, через GitHub Actions (ниже).
+- Вручную с мака: `make deploy` (тесты → сборка → `scp` → `systemctl restart there`) и `make web`.
+
+**Выкладка через GitHub Actions**
+- `.github/workflows/deploy-server.yml`: при изменениях в `server/` тесты, сборка, загрузка,
+  перезапуск, проверка `/healthz`. На пул-реквестах — только тесты.
+- `.github/workflows/deploy-web.yml`: при изменениях в `web/` загрузка сайта.
+- Обе можно запустить вручную: Actions → workflow → Run workflow.
+- Заходят на дроплет пользователем `deploy`: он владеет `/opt/there` и `/var/www/there` и через
+  sudo может только `systemctl restart there`. Его единственный ключ — публичная половина в
+  `deploy/github-actions.pub`; ключ ограничен опцией `restrict` (без терминала и туннелей).
+  Пользователя создаёт `make provision`.
+- В GitHub (Settings → Environments → `production`):
+  - секрет `DEPLOY_SSH_KEY` — приватный ключ к `deploy/github-actions.pub`;
+  - переменная `DEPLOY_IP` — IP дроплета;
+  - переменная `DEPLOY_KNOWN_HOSTS` — строка `ssh-keyscan -t ed25519 <IP>`, сверенная с
+    `~/.ssh/known_hosts` на маке.
+- Пул-реквесты из форков секретов не получают и в `production` не выкладывают.
+- Заменить ключ: новый `ssh-keygen -t ed25519`, публичную половину в `deploy/github-actions.pub`,
+  `make provision`, приватную — в секрет.
 
 ## 2. Ссылки-приглашения
 

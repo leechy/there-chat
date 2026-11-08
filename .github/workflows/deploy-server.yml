@@ -1,0 +1,49 @@
+# Tests the server on every push and pull request; on main also deploys it.
+# Secrets and variables: see docs/DEPLOY.md, "Выкладка через GitHub Actions".
+name: Server
+
+on:
+  push:
+    branches: [main]
+    paths: [server/**, Makefile, .github/workflows/deploy-server.yml]
+  pull_request:
+    paths: [server/**]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - run: make test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: SSH key
+        run: |
+          install -d -m 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ vars.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      - name: Build, upload, restart, check health
+        run: make deploy HOST="deploy@${{ vars.DEPLOY_IP }}" SUDO=sudo
